@@ -1,14 +1,12 @@
 // pub write<T>(steam: )
 
-use tokio::io::{AsyncRead, AsyncReadExt, AsyncWrite, AsyncWriteExt};
 use serde::{Deserialize, Serialize};
+use tokio::io::{AsyncRead, AsyncReadExt, AsyncWrite, AsyncWriteExt};
 
 #[derive(Deserialize, Serialize, Debug)]
 pub enum Action {
-    Bind(String)
-
+    Bind(String),
 }
-
 
 pub async fn write<W>(mut writer: W, data: &[u8]) -> std::io::Result<()>
 where

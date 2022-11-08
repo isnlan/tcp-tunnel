@@ -1,11 +1,14 @@
 mod client;
+mod message;
 mod protocol;
 mod server;
-pub mod pack;
+mod session;
+pub mod utils;
 
+pub use client::connect;
+pub use message::*;
 pub use server::*;
-pub use pack::*;
-
+pub use utils::*;
 
 #[cfg(test)]
 mod tests {
