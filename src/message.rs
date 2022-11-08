@@ -1,6 +1,7 @@
 use crate::utils;
 use anyhow::{anyhow, Result};
 use serde::{Deserialize, Serialize};
+use tokio::io::AsyncReadExt;
 use tokio::net::TcpStream;
 
 #[derive(Debug, Serialize, Deserialize, PartialEq, Eq)]
@@ -26,7 +27,7 @@ pub enum Message {
 }
 
 impl Message {
-    pub async fn read(stream: &mut TcpStream) -> Result<Message> {
+    pub async fn read<R:  AsyncReadExt + Unpin>(stream: &mut R) -> Result<Message> {
         let data = utils::read_data(stream).await?;
         bincode::deserialize(&data).map_err(|err| anyhow!(err))
     }

@@ -1,6 +1,7 @@
 use crate::Message;
 use anyhow::Result;
 use std::collections::HashMap;
+use std::ptr::read;
 use tokio::net::TcpStream;
 
 pub struct Session {
@@ -24,11 +25,17 @@ impl Session {
         }
     }
 
-    pub fn serve() {
-        loop {}
+    pub fn serve(&mut self) -> Result<()> {
+        let (mut read, mut write) = self.stream.split();
+
+        loop {
+            let msg = Message::read(&mut read);
+
+        }
+        Ok(())
     }
 
-    fn serveMessage(&self, msg: Message) -> Result<()> {
+    fn serve_message(&self, msg: Message) -> Result<()> {
         Ok(())
     }
 }
