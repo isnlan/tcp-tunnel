@@ -1,4 +1,4 @@
-use crate::{utils, Message};
+use crate::{utils, Message, Connect};
 use anyhow::{anyhow, bail, Context, Result};
 use backoff::ExponentialBackoff;
 use backoff::{backoff::Backoff, future::retry_notify};
@@ -33,7 +33,16 @@ pub async fn connect(addr: &str, token: &str) -> Result<()> {
     msg.write(&mut stream).await?;
 
 
-    let session = Session::new(token.to_string(), rand::random(), stream, true);
+    let msg = Message::Connect(Connect{
+        id: 12,
+        connect_id: 12,
+        proto: "tcp".to_string(),
+        address: "127.0.0.1".to_string()
+    });
+    msg.write(&mut stream).await?;
+
+    tokio::time::sleep(Duration::from_secs(100)).await;
+    // let session = Session::new(token.to_string(), rand::random(), stream, true);
 
     Ok(())
 }

@@ -1,8 +1,9 @@
+use std::collections::HashMap;
 use crate::{message::Message, session::Session};
 use crate::{utils, Connect};
 use anyhow::{anyhow, Ok, Result};
 use std::net::SocketAddr;
-use std::sync::Arc;
+use std::sync::{Arc, Mutex};
 use std::thread::park;
 use tokio::net::{TcpListener, TcpStream};
 use tracing::info;
@@ -14,6 +15,7 @@ pub trait Authorizer {
 pub struct Server<A: Authorizer> {
     ath: Arc<A>,
     addr: SocketAddr,
+    sess: Arc<Mutex<HashMap<String, Arc<Session>>>>
 }
 
 impl<A> Server<A>
@@ -24,6 +26,7 @@ where
         Self {
             ath: Arc::new(ath),
             addr,
+            sess: Arc::new(Mutex::new(HashMap::new()))
         }
     }
 
@@ -54,7 +57,12 @@ where
 
         println!("new client connect, token: {}", token);
 
-        let session = Session::new(token, rand::random(), stream, false);
+        let mut session = Arc::new(Session::new(token.clone(), rand::random(), stream, false));
+        // session.serve().await?;
+
+        let mut lock = self.sess.lock().unwrap();
+        lock.insert(token, session);
+
 
         Ok(())
     }
