@@ -28,13 +28,13 @@ pub enum Message {
 
 impl Message {
     pub async fn read<R: AsyncReadExt + Unpin>(stream: &mut R) -> Result<Message> {
-        let data = utils::read_data(stream).await?;
+        let data = utils::read(stream).await?;
         bincode::deserialize(&data).map_err(|err| anyhow!(err))
     }
 
     pub async fn write(&self, stream: &mut TcpStream) -> Result<()> {
         let encoded: Vec<u8> = bincode::serialize(self)?;
-        utils::write_all(stream, &encoded).await?;
+        utils::write(stream, &encoded).await?;
         Ok(())
     }
 }
