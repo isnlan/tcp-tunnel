@@ -7,15 +7,15 @@ use tokio::net::TcpStream;
 #[derive(Debug, Serialize, Deserialize, PartialEq, Eq)]
 pub struct Connect {
     pub id: i64,
-    pub connect_id: i64,
+    pub conn_id: i64,
     pub proto: String,
-    pub address: String,
+    pub addr: String,
 }
 
 #[derive(Debug, Serialize, Deserialize, PartialEq, Eq)]
 pub struct Data {
     id: i64,
-    connect_id: i64,
+    conn_id: i64,
     data: Vec<u8>,
 }
 
@@ -27,7 +27,7 @@ pub enum Message {
 }
 
 impl Message {
-    pub async fn read<R:  AsyncReadExt + Unpin>(stream: &mut R) -> Result<Message> {
+    pub async fn read<R: AsyncReadExt + Unpin>(stream: &mut R) -> Result<Message> {
         let data = utils::read_data(stream).await?;
         bincode::deserialize(&data).map_err(|err| anyhow!(err))
     }

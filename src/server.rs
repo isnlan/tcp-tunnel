@@ -1,11 +1,11 @@
-use std::collections::HashMap;
-use crate::{message::Message, session::Session};
+use crate::{message::Message, session::Session, MyStream};
 use crate::{utils, Connect};
 use anyhow::{anyhow, Ok, Result};
+use std::collections::HashMap;
 use std::net::SocketAddr;
-use std::sync::{Arc, };
+use std::sync::Arc;
 use std::thread::park;
-use tokio::net::{TcpListener, TcpStream};
+use tokio::net::{TcpListener, TcpStream, ToSocketAddrs};
 use tokio::spawn;
 use tokio::sync::Mutex;
 use tracing::info;
@@ -17,7 +17,7 @@ pub trait Authorizer {
 pub struct Server<A: Authorizer> {
     ath: Arc<A>,
     addr: SocketAddr,
-    sess: Arc<Mutex<HashMap<String, Arc<Session>>>>
+    sess: Arc<Mutex<HashMap<String, Arc<Session>>>>,
 }
 
 impl<A> Server<A>
@@ -28,7 +28,7 @@ where
         Self {
             ath: Arc::new(ath),
             addr,
-            sess: Arc::new(Mutex::new(HashMap::new()))
+            sess: Arc::new(Mutex::new(HashMap::new())),
         }
     }
 
@@ -59,17 +59,27 @@ where
 
         println!("new client connect, token: {}", token);
 
-        let mut session = Arc::new(Session::new(token.clone(), rand::random(),stream,  false));
+        let mut session = Arc::new(Session::new(token.clone(), rand::random(), stream, false));
 
         let sess_c = session.clone();
         spawn(async move {
-            let _= sess_c.serve().await;
+            let _ = sess_c.serve().await;
         });
 
         let mut lock = self.sess.lock().await;
         lock.insert(token, session);
 
-
         Ok(())
+    }
+
+    async fn get_stream(&self, token: &str, proto: &str, addr: &str) -> Result<Option<MyStream>> {
+        let mut lock = self.sess.lock().await;
+        match lock.get(token) {
+            Some(session) => {
+                let stream = session.get_stream(proto, addr)?;
+                Ok(Some(stream))
+            }
+            None => Ok(Option::None),
+        }
     }
 }
