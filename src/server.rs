@@ -6,8 +6,8 @@ use std::net::SocketAddr;
 use std::sync::Arc;
 
 use tokio::net::{TcpListener, TcpStream};
-use tokio::spawn;
 use tokio::sync::Mutex;
+use tokio::{spawn, task};
 
 pub trait Authorizer {
     fn auth(&self, token: &str) -> bool;
@@ -61,7 +61,7 @@ where
         let session = Arc::new(Session::new(token.clone(), rand::random(), stream, false));
 
         let sess_c = session.clone();
-        spawn(async move {
+        task::spawn(async move {
             let _ = sess_c.serve().await;
         });
 

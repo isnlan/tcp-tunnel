@@ -1,8 +1,7 @@
-use crate::{Message, MyStream};
+use crate::{Connect, Message, MyStream};
 use anyhow::Result;
 
 use std::collections::HashMap;
-
 use std::sync::atomic::{AtomicI64, Ordering};
 use tokio::io::{AsyncReadExt, AsyncWriteExt};
 use tokio::net::TcpStream;
@@ -49,6 +48,13 @@ impl Session {
     pub fn get_stream(&self, proto: &str, addr: &str) -> Result<MyStream> {
         let conn_id = self.next_conn_id.fetch_add(1, Ordering::SeqCst);
         let stream = MyStream::new(conn_id, proto, addr);
+
+        let msg = Message::Connect(Connect {
+            id: 0,
+            conn_id,
+            proto: proto.to_string(),
+            addr: proto.to_string(),
+        });
         Ok(stream)
     }
 

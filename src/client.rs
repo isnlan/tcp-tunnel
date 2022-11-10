@@ -5,6 +5,7 @@ use backoff::future::retry_notify;
 use backoff::ExponentialBackoff;
 use tokio::io::AsyncWriteExt;
 use tokio::net::TcpStream;
+use tokio::task;
 
 use tokio::time::Duration;
 use tracing::warn;
@@ -44,7 +45,7 @@ pub async fn connect(addr: &str, token: &str) -> Result<()> {
     // tokio::time::sleep(Duration::from_secs(100)).await;
     let session = Session::new(token.to_string(), rand::random(), stream, true);
 
-    tokio::spawn(async move {
+    task::spawn(async move {
         let _ = session.serve().await;
     });
 
