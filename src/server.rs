@@ -71,11 +71,16 @@ where
         Ok(())
     }
 
-    async fn get_stream(&self, token: &str, proto: &str, addr: &str) -> Result<Option<MyStream>> {
+    pub async fn get_stream(
+        &self,
+        token: &str,
+        proto: &str,
+        addr: &str,
+    ) -> Result<Option<MyStream>> {
         let lock = self.sess.lock().await;
         match lock.get(token) {
             Some(session) => {
-                let stream = session.get_stream(proto, addr)?;
+                let stream = session.get_stream(proto, addr).await?;
                 Ok(Some(stream))
             }
             None => Ok(Option::None),

@@ -45,9 +45,9 @@ pub async fn connect(addr: &str, token: &str) -> Result<()> {
     // tokio::time::sleep(Duration::from_secs(100)).await;
     let session = Session::new(token.to_string(), rand::random(), stream, true);
 
-    task::spawn(async move {
-        let _ = session.serve().await;
-    });
+    // task::spawn(async move {
+    let _ = session.serve().await;
+    // });
 
     Ok(())
 }

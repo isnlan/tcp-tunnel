@@ -5,6 +5,7 @@ use std::collections::HashMap;
 use std::sync::atomic::{AtomicI64, Ordering};
 use tokio::io::{AsyncReadExt, AsyncWriteExt};
 use tokio::net::TcpStream;
+use tokio::sync::mpsc::{self, Receiver, Sender};
 use tokio::sync::Mutex;
 
 pub struct Session {
@@ -14,10 +15,14 @@ pub struct Session {
     stream: Mutex<TcpStream>,
     conns: HashMap<i64, MyStream>,
     client: bool,
+    msg_sender: Sender<Message>,
+    msg_recvicer: Mutex<Receiver<Message>>,
 }
 
 impl Session {
     pub fn new(token: String, session_key: i64, steam: TcpStream, client: bool) -> Self {
+        let (tx, rx) = mpsc::channel(100);
+
         Self {
             next_conn_id: AtomicI64::new(1),
             token,
@@ -25,6 +30,8 @@ impl Session {
             stream: Mutex::new(steam),
             conns: HashMap::new(),
             client,
+            msg_sender: tx,
+            msg_recvicer: Mutex::new(rx),
         }
     }
 
@@ -45,16 +52,19 @@ impl Session {
         Ok(())
     }
 
-    pub fn get_stream(&self, proto: &str, addr: &str) -> Result<MyStream> {
+    pub async fn get_stream(&self, proto: &str, addr: &str) -> Result<MyStream> {
         let conn_id = self.next_conn_id.fetch_add(1, Ordering::SeqCst);
         let stream = MyStream::new(conn_id, proto, addr);
 
-        let _msg = Message::Connect(Connect {
+        let msg = Message::Connect(Connect {
             id: 0,
             conn_id,
             proto: proto.to_string(),
             addr: proto.to_string(),
         });
+
+        self.msg_sender.send(msg).await?;
+
         Ok(stream)
     }
 
@@ -71,7 +81,14 @@ impl Session {
         }
     }
 
-    async fn process_write<R: AsyncWriteExt + Unpin>(&self, _write: &mut R) -> Result<()> {
+    async fn process_write<R: AsyncWriteExt + Unpin>(&self, write: &mut R) -> Result<()> {
+        let mut rx = self.msg_recvicer.lock().await;
+        while let Some(msg) = rx.recv().await {
+            // todo break loop
+            println!("send -> {:?}", msg);
+
+            msg.write(write).await?;
+        }
         Ok(())
     }
 }

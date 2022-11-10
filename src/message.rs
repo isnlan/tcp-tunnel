@@ -1,7 +1,7 @@
 use crate::utils;
 use anyhow::{anyhow, Result};
 use serde::{Deserialize, Serialize};
-use tokio::io::AsyncReadExt;
+use tokio::io::{AsyncReadExt, AsyncWriteExt};
 use tokio::net::TcpStream;
 
 #[derive(Debug, Serialize, Deserialize, PartialEq, Eq)]
@@ -32,7 +32,7 @@ impl Message {
         bincode::deserialize(&data).map_err(|err| anyhow!(err))
     }
 
-    pub async fn write(&self, stream: &mut TcpStream) -> Result<()> {
+    pub async fn write<W: AsyncWriteExt + Unpin>(&self, stream: &mut W) -> Result<()> {
         let encoded: Vec<u8> = bincode::serialize(self)?;
         utils::write(stream, &encoded).await?;
         Ok(())

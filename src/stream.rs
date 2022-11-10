@@ -1,3 +1,4 @@
+#[derive(Debug)]
 pub struct MyStream {
     conn_id: i64,
     proto: String,
