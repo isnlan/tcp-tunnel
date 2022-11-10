@@ -4,10 +4,10 @@ use anyhow::{anyhow, Ok, Result};
 use std::collections::HashMap;
 use std::net::SocketAddr;
 use std::sync::Arc;
+use tokio::task;
 
 use tokio::net::{TcpListener, TcpStream};
 use tokio::sync::Mutex;
-use tokio::{spawn, task};
 
 pub trait Authorizer {
     fn auth(&self, token: &str) -> bool;

@@ -49,7 +49,7 @@ impl Session {
         let conn_id = self.next_conn_id.fetch_add(1, Ordering::SeqCst);
         let stream = MyStream::new(conn_id, proto, addr);
 
-        let msg = Message::Connect(Connect {
+        let _msg = Message::Connect(Connect {
             id: 0,
             conn_id,
             proto: proto.to_string(),
