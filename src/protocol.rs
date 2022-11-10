@@ -33,13 +33,10 @@ where
 
 #[cfg(test)]
 mod tests {
-    use tokio::io::{AsyncReadExt, AsyncWriteExt};
 
     #[tokio::test]
     async fn test_write() {
-        use tokio::io::{AsyncReadExt, AsyncWriteExt};
-
-        let (mut client, mut server) = tokio::io::duplex(1024);
+        let (client, server) = tokio::io::duplex(1024);
 
         super::write(server, b"pong").await.unwrap();
 

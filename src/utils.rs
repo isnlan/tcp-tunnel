@@ -1,6 +1,5 @@
 use std::io;
 use tokio::io::{AsyncReadExt, AsyncWriteExt};
-use tokio::net::TcpStream;
 
 pub async fn write_all<W: AsyncWriteExt + Unpin>(stream: &mut W, data: &[u8]) -> io::Result<()> {
     let size = data.len();
@@ -22,7 +21,7 @@ pub async fn read_data<R: AsyncReadExt + Unpin>(stream: &mut R) -> io::Result<Ve
 
 #[cfg(test)]
 mod tests {
-    use std::io::{BufWriter, Cursor};
+    use std::io::Cursor;
 
     use super::*;
 

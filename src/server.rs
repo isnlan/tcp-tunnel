@@ -1,14 +1,13 @@
 use crate::{message::Message, session::Session, MyStream};
-use crate::{utils, Connect};
+
 use anyhow::{anyhow, Ok, Result};
 use std::collections::HashMap;
 use std::net::SocketAddr;
 use std::sync::Arc;
-use std::thread::park;
-use tokio::net::{TcpListener, TcpStream, ToSocketAddrs};
+
+use tokio::net::{TcpListener, TcpStream};
 use tokio::spawn;
 use tokio::sync::Mutex;
-use tracing::info;
 
 pub trait Authorizer {
     fn auth(&self, token: &str) -> bool;
@@ -59,7 +58,7 @@ where
 
         println!("new client connect, token: {}", token);
 
-        let mut session = Arc::new(Session::new(token.clone(), rand::random(), stream, false));
+        let session = Arc::new(Session::new(token.clone(), rand::random(), stream, false));
 
         let sess_c = session.clone();
         spawn(async move {
@@ -73,7 +72,7 @@ where
     }
 
     async fn get_stream(&self, token: &str, proto: &str, addr: &str) -> Result<Option<MyStream>> {
-        let mut lock = self.sess.lock().await;
+        let lock = self.sess.lock().await;
         match lock.get(token) {
             Some(session) => {
                 let stream = session.get_stream(proto, addr)?;

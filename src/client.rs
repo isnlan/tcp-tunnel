@@ -1,13 +1,13 @@
 use crate::session::Session;
-use crate::{utils, Connect, Message};
-use anyhow::{anyhow, bail, Context, Result};
+use crate::{Connect, Message};
+use anyhow::{Context, Result};
+use backoff::future::retry_notify;
 use backoff::ExponentialBackoff;
-use backoff::{backoff::Backoff, future::retry_notify};
 use tokio::io::AsyncWriteExt;
 use tokio::net::TcpStream;
-use tokio::spawn;
-use tokio::time::{self, Duration, Instant};
-use tracing::{debug, error, info, instrument, trace, warn, Instrument, Span};
+
+use tokio::time::Duration;
+use tracing::warn;
 
 pub async fn connect(addr: &str, token: &str) -> Result<()> {
     let backoff = ExponentialBackoff {

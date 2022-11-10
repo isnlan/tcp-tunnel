@@ -1,13 +1,12 @@
 use crate::{Message, MyStream};
 use anyhow::Result;
-use std::borrow::BorrowMut;
+
 use std::collections::HashMap;
-use std::ptr::read;
+
 use std::sync::atomic::{AtomicI64, Ordering};
-use tokio::io::{AsyncReadExt, AsyncWriteExt, BufStream};
-use tokio::net::{TcpSocket, TcpStream, ToSocketAddrs};
+use tokio::io::{AsyncReadExt, AsyncWriteExt};
+use tokio::net::TcpStream;
 use tokio::sync::Mutex;
-use tokio::task;
 
 pub struct Session {
     next_conn_id: AtomicI64,
@@ -58,7 +57,7 @@ impl Session {
             let msg = Message::read(read).await?;
 
             match msg {
-                Message::Connect(connect) => {
+                Message::Connect(_connect) => {
                     println!("create connect!!");
                 }
                 _ => return Ok(()),
@@ -66,7 +65,7 @@ impl Session {
         }
     }
 
-    async fn process_write<R: AsyncWriteExt + Unpin>(&self, write: &mut R) -> Result<()> {
+    async fn process_write<R: AsyncWriteExt + Unpin>(&self, _write: &mut R) -> Result<()> {
         Ok(())
     }
 }
