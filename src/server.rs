@@ -3,9 +3,11 @@ use crate::{message::Message, session::Session};
 use crate::{utils, Connect};
 use anyhow::{anyhow, Ok, Result};
 use std::net::SocketAddr;
-use std::sync::{Arc, Mutex};
+use std::sync::{Arc, };
 use std::thread::park;
 use tokio::net::{TcpListener, TcpStream};
+use tokio::spawn;
+use tokio::sync::Mutex;
 use tracing::info;
 
 pub trait Authorizer {
@@ -57,10 +59,14 @@ where
 
         println!("new client connect, token: {}", token);
 
-        let mut session = Arc::new(Session::new(token.clone(), rand::random(), stream, false));
-        // session.serve().await?;
+        let mut session = Arc::new(Session::new(token.clone(), rand::random(),stream,  false));
 
-        let mut lock = self.sess.lock().unwrap();
+        let sess_c = session.clone();
+        spawn(async move {
+            let _= sess_c.serve().await;
+        });
+
+        let mut lock = self.sess.lock().await;
         lock.insert(token, session);
 
 
