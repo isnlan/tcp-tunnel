@@ -8,6 +8,7 @@ use tokio::task;
 
 use tokio::net::{TcpListener, TcpStream};
 use tokio::sync::Mutex;
+use tracing::info;
 
 pub trait Authorizer {
     fn auth(&self, token: &str) -> bool;
@@ -36,15 +37,10 @@ where
 
         loop {
             let (stream, addr) = ln.accept().await?;
-            // tokio::spawn(async move {
-            let ret = self.process(stream).await;
-            match ret {
-                Err(err) => {
-                    println!("ERR: {}, addr:{}", err, addr)
-                }
-                _ => {}
+
+            if let Err(err) = self.process(stream).await {
+                info!("ERR: {}, addr:{}", err, addr)
             }
-            // });
         }
     }
 
@@ -56,7 +52,7 @@ where
             _ => return Err(anyhow!("invalid client token protocol")),
         };
 
-        println!("new client connect, token: {}", token);
+        info!("new client connect, token: {}", token);
 
         let session = Arc::new(Session::new(token.clone(), rand::random(), stream, false));
 

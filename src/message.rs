@@ -23,6 +23,7 @@ pub enum Message {
     Token(String),
     Connect(Connect),
     Data(Data),
+    Close,
 }
 
 impl Message {

@@ -15,16 +15,25 @@ use axum::{
 use std::{borrow::Cow, net::SocketAddr, sync::Arc, time::Duration};
 use tower::{BoxError, ServiceBuilder};
 use tower_http::trace::TraceLayer;
+use tracing::{info, Level};
+use tracing_subscriber::FmtSubscriber;
 
 #[tokio::main]
 async fn main() -> Result<()> {
+    let subscriber = FmtSubscriber::builder()
+        .with_max_level(Level::DEBUG)
+        // completes the builder.
+        .finish();
+
+    tracing::subscriber::set_global_default(subscriber).expect("setting default subscriber failed");
+
     let addr = "0.0.0.0:6666";
     let addr = addr.parse::<SocketAddr>()?;
     let server = Arc::new(tcp_tunnel::Server::new(MyAuth {}, addr));
 
     let server_c = server.clone();
     task::spawn(async move {
-        println!("--run--");
+        info!("--run--");
         server_c.serve().await.unwrap();
     });
 
@@ -43,7 +52,7 @@ async fn main() -> Result<()> {
         );
 
     let addr = SocketAddr::from(([0, 0, 0, 0], 3000));
-    tracing::debug!("listening on {}", addr);
+    tracing::info!("listening on {}", addr);
     axum::Server::bind(&addr)
         .serve(app.into_make_service())
         .await?;

@@ -7,6 +7,7 @@ use tokio::io::{AsyncReadExt, AsyncWriteExt};
 use tokio::net::TcpStream;
 use tokio::sync::mpsc::{self, Receiver, Sender};
 use tokio::sync::Mutex;
+use tracing::{debug, error, info, warn};
 
 pub struct Session {
     next_conn_id: AtomicI64,
@@ -40,14 +41,22 @@ impl Session {
         let (mut read, mut write) = stream.split();
 
         let r = async {
-            let _ = self.process_read(&mut read).await;
+            if let Err(err) = self.process_read(&mut read).await {
+                error!("session process read error: {:?}", err);
+            }
+
+            self.msg_tx.send(Message::Close).await
         };
 
         let w = async {
-            let _ = self.process_write(&mut write).await;
+            if let Err(err) = self.process_write(&mut write).await {
+                error!("session process write error: {:?}", err);
+            }
         };
 
         tokio::join!(r, w);
+
+        warn!("session server closed!");
 
         Ok(())
     }
@@ -74,7 +83,7 @@ impl Session {
 
             match msg {
                 Message::Connect(connect) => {
-                    println!("create connect!! -> {:?}", connect);
+                    info!("create connect!! -> {:?}", connect);
                 }
                 _ => return Ok(()),
             }
@@ -85,9 +94,14 @@ impl Session {
         let mut rx = self.msg_rx.lock().await;
         while let Some(msg) = rx.recv().await {
             // todo break loop
-            println!("send -> {:?}", msg);
+            match msg {
+                Message::Close => break,
+                _ => {
+                    debug!("send -> {:?}", msg);
 
-            msg.write(write).await?;
+                    msg.write(write).await?;
+                }
+            }
         }
         Ok(())
     }
