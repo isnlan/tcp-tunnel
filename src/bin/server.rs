@@ -1,8 +1,29 @@
 use anyhow::Result;
-use std::net::SocketAddr;
-use std::sync::Arc;
-use std::time::Duration;
+
+use tcp_tunnel::Server;
 use tokio::task;
+
+use axum::{
+    body::Bytes,
+    error_handling::HandleErrorLayer,
+    extract::{ContentLengthLimit, Extension, Path},
+    handler::Handler,
+    http::StatusCode,
+    response::IntoResponse,
+    routing::{delete, get},
+    Router,
+};
+use std::{
+    borrow::Cow,
+    collections::HashMap,
+    net::SocketAddr,
+    sync::{Arc, RwLock},
+    time::Duration,
+};
+use tower::{BoxError, ServiceBuilder};
+use tower_http::{
+    auth::RequireAuthorizationLayer, compression::CompressionLayer, trace::TraceLayer,
+};
 
 #[tokio::main]
 async fn main() -> Result<()> {
@@ -16,13 +37,60 @@ async fn main() -> Result<()> {
         server_c.serve().await.unwrap();
     });
 
-    tokio::time::sleep(Duration::from_secs(5)).await;
+    let app = Router::new()
+        .route("/:proto/:addr/:token", get(root))
+        .layer(
+            ServiceBuilder::new()
+                // Handle errors from middleware
+                .layer(HandleErrorLayer::new(handle_error))
+                .load_shed()
+                .concurrency_limit(1024)
+                .timeout(Duration::from_secs(10))
+                .layer(TraceLayer::new_for_http())
+                .layer(Extension(server))
+                .into_inner(),
+        );
 
-    let stream = server.get_stream("hello", "tcp", "127.0.0.1:80").await?;
-
-    println!("--> {:?}", stream.unwrap());
+    let addr = SocketAddr::from(([0, 0, 0, 0], 3000));
+    tracing::debug!("listening on {}", addr);
+    axum::Server::bind(&addr)
+        .serve(app.into_make_service())
+        .await?;
 
     Ok(())
+}
+
+type SharedState = Arc<Server<MyAuth>>;
+
+async fn root(
+    Path((proto, addr, token)): Path<(String, String, String)>,
+    Extension(server): Extension<SharedState>,
+) -> std::result::Result<String, StatusCode> {
+    match server.get_stream(&token, &proto, &addr).await {
+        Ok(stream) => match stream {
+            Some(steam) => Ok("ok".to_string()),
+            None => Err(StatusCode::NOT_FOUND),
+        },
+        Err(err) => Err(StatusCode::INTERNAL_SERVER_ERROR),
+    }
+}
+
+async fn handle_error(error: BoxError) -> impl IntoResponse {
+    if error.is::<tower::timeout::error::Elapsed>() {
+        return (StatusCode::REQUEST_TIMEOUT, Cow::from("request timed out"));
+    }
+
+    if error.is::<tower::load_shed::error::Overloaded>() {
+        return (
+            StatusCode::SERVICE_UNAVAILABLE,
+            Cow::from("service is overloaded, try again later"),
+        );
+    }
+
+    (
+        StatusCode::INTERNAL_SERVER_ERROR,
+        Cow::from(format!("Unhandled internal error: {}", error)),
+    )
 }
 
 struct MyAuth {}

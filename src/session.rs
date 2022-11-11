@@ -15,8 +15,8 @@ pub struct Session {
     stream: Mutex<TcpStream>,
     conns: HashMap<i64, MyStream>,
     client: bool,
-    msg_sender: Sender<Message>,
-    msg_recvicer: Mutex<Receiver<Message>>,
+    msg_tx: Sender<Message>,
+    msg_rx: Mutex<Receiver<Message>>,
 }
 
 impl Session {
@@ -30,8 +30,8 @@ impl Session {
             stream: Mutex::new(steam),
             conns: HashMap::new(),
             client,
-            msg_sender: tx,
-            msg_recvicer: Mutex::new(rx),
+            msg_tx: tx,
+            msg_rx: Mutex::new(rx),
         }
     }
 
@@ -63,7 +63,7 @@ impl Session {
             addr: proto.to_string(),
         });
 
-        self.msg_sender.send(msg).await?;
+        self.msg_tx.send(msg).await?;
 
         Ok(stream)
     }
@@ -73,8 +73,8 @@ impl Session {
             let msg = Message::read(read).await?;
 
             match msg {
-                Message::Connect(_connect) => {
-                    println!("create connect!!");
+                Message::Connect(connect) => {
+                    println!("create connect!! -> {:?}", connect);
                 }
                 _ => return Ok(()),
             }
@@ -82,7 +82,7 @@ impl Session {
     }
 
     async fn process_write<R: AsyncWriteExt + Unpin>(&self, write: &mut R) -> Result<()> {
-        let mut rx = self.msg_recvicer.lock().await;
+        let mut rx = self.msg_rx.lock().await;
         while let Some(msg) = rx.recv().await {
             // todo break loop
             println!("send -> {:?}", msg);
