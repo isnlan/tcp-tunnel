@@ -4,26 +4,17 @@ use tcp_tunnel::Server;
 use tokio::task;
 
 use axum::{
-    body::Bytes,
     error_handling::HandleErrorLayer,
-    extract::{ContentLengthLimit, Extension, Path},
+    extract::{Extension, Path},
     handler::Handler,
     http::StatusCode,
     response::IntoResponse,
-    routing::{delete, get},
+    routing::get,
     Router,
 };
-use std::{
-    borrow::Cow,
-    collections::HashMap,
-    net::SocketAddr,
-    sync::{Arc, RwLock},
-    time::Duration,
-};
+use std::{borrow::Cow, net::SocketAddr, sync::Arc, time::Duration};
 use tower::{BoxError, ServiceBuilder};
-use tower_http::{
-    auth::RequireAuthorizationLayer, compression::CompressionLayer, trace::TraceLayer,
-};
+use tower_http::trace::TraceLayer;
 
 #[tokio::main]
 async fn main() -> Result<()> {
@@ -68,10 +59,10 @@ async fn root(
 ) -> std::result::Result<String, StatusCode> {
     match server.get_stream(&token, &proto, &addr).await {
         Ok(stream) => match stream {
-            Some(steam) => Ok("ok".to_string()),
+            Some(_steam) => Ok("ok".to_string()),
             None => Err(StatusCode::NOT_FOUND),
         },
-        Err(err) => Err(StatusCode::INTERNAL_SERVER_ERROR),
+        Err(_err) => Err(StatusCode::INTERNAL_SERVER_ERROR),
     }
 }
 

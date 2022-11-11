@@ -5,7 +5,6 @@ use backoff::future::retry_notify;
 use backoff::ExponentialBackoff;
 use tokio::io::AsyncWriteExt;
 use tokio::net::TcpStream;
-use tokio::task;
 
 use tokio::time::Duration;
 use tracing::warn;

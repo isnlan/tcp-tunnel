@@ -2,7 +2,6 @@ use crate::utils;
 use anyhow::{anyhow, Result};
 use serde::{Deserialize, Serialize};
 use tokio::io::{AsyncReadExt, AsyncWriteExt};
-use tokio::net::TcpStream;
 
 #[derive(Debug, Serialize, Deserialize, PartialEq, Eq)]
 pub struct Connect {
