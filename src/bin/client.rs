@@ -1,6 +1,6 @@
 use anyhow::Result;
 
-use tracing::{info, Level};
+use tracing::Level;
 use tracing_subscriber::FmtSubscriber;
 
 #[tokio::main]
