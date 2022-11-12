@@ -5,14 +5,19 @@ pub struct MyStream {
     conn_id: i64,
     proto: String,
     addr: String,
+    buf_client: tokio::io::DuplexStream,
+    buf_server: tokio::io::DuplexStream,
 }
 
 impl MyStream {
     pub fn new(conn_id: i64, proto: &str, addr: &str) -> Self {
+        let (buf_client, mut buf_server) = tokio::io::duplex(64);
         MyStream {
             conn_id,
             proto: proto.to_string(),
             addr: addr.to_string(),
+            buf_client,
+            buf_server,
         }
     }
 }
