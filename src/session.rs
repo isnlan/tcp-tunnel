@@ -83,7 +83,9 @@ impl Session {
 
             match msg {
                 Message::Connect(connect) => {
-                    info!("create connect!! -> {:?}", connect);
+                    self.client_connect(connect).await?;
+                    // info!("create connect!! -> {:?}", connect);
+                    // tokio::io::copy_bidirectional(a, b)
                 }
                 _ => return Ok(()),
             }
@@ -105,6 +107,14 @@ impl Session {
         }
         Ok(())
     }
-}
 
-pub struct Connection {}
+    async fn client_connect(&self, connect: Connect) -> Result<()> {
+        let mut mystream = MyStream::new(connect.conn_id, &connect.proto, &connect.addr);
+        if connect.proto == "tcp" {
+            let mut stream = TcpStream::connect(connect.addr).await?;
+
+            tokio::io::copy_bidirectional(&mut mystream, &mut stream).await?;
+        }
+        Ok(())
+    }
+}
