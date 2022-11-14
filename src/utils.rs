@@ -1,7 +1,7 @@
 use std::io;
-use tokio::io::{AsyncReadExt, AsyncWriteExt};
+use tokio::io::{AsyncRead, AsyncReadExt, AsyncWrite, AsyncWriteExt};
 
-pub async fn write<W: AsyncWriteExt + Unpin>(stream: &mut W, data: &[u8]) -> io::Result<()> {
+pub async fn write<W: AsyncWrite + Unpin>(stream: &mut W, data: &[u8]) -> io::Result<()> {
     let size = data.len();
 
     stream.write_u32(size as u32).await?;
@@ -10,7 +10,7 @@ pub async fn write<W: AsyncWriteExt + Unpin>(stream: &mut W, data: &[u8]) -> io:
     Ok(())
 }
 
-pub async fn read<R: AsyncReadExt + Unpin>(stream: &mut R) -> io::Result<Vec<u8>> {
+pub async fn read<R: AsyncRead + Unpin>(stream: &mut R) -> io::Result<Vec<u8>> {
     let size = stream.read_u32().await?;
     let mut data = vec![0; size as usize];
 
