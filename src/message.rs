@@ -13,9 +13,9 @@ pub struct Connect {
 
 #[derive(Debug, Serialize, Deserialize, PartialEq, Eq)]
 pub struct Data {
-    id: i64,
-    conn_id: i64,
-    data: Vec<u8>,
+    pub id: i64,
+    pub conn_id: i64,
+    pub data: Vec<u8>,
 }
 
 #[derive(Debug, Serialize, Deserialize, PartialEq, Eq)]

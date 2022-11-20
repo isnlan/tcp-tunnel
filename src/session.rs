@@ -1,26 +1,26 @@
 use crate::{Connect, Message, MyStream};
-use anyhow::Result;
+use anyhow::{Ok, Result};
 
 use std::collections::HashMap;
 use std::sync::atomic::{AtomicI64, Ordering};
-use tokio::io::{AsyncReadExt, AsyncWriteExt};
+use tokio::io::{AsyncRead, AsyncWrite, DuplexStream};
 use tokio::net::TcpStream;
 use tokio::sync::mpsc::{self, Receiver, Sender};
 use tokio::sync::Mutex;
 use tracing::{debug, error, info, warn};
 
-pub struct Session {
+pub struct Session<T: AsyncRead + AsyncWrite> {
     next_conn_id: AtomicI64,
     token: String,
     session_key: i64,
     stream: Mutex<TcpStream>,
-    conns: HashMap<i64, MyStream>,
+    conns: Mutex<HashMap<i64, MyStream<T>>>,
     client: bool,
     msg_tx: Sender<Message>,
     msg_rx: Mutex<Receiver<Message>>,
 }
 
-impl Session {
+impl<T: AsyncRead + AsyncWrite> Session<T> {
     pub fn new(token: String, session_key: i64, steam: TcpStream, client: bool) -> Self {
         let (tx, rx) = mpsc::channel(100);
 
@@ -29,7 +29,7 @@ impl Session {
             token,
             session_key,
             stream: Mutex::new(steam),
-            conns: HashMap::new(),
+            conns: Mutex::new(HashMap::new()),
             client,
             msg_tx: tx,
             msg_rx: Mutex::new(rx),
@@ -61,9 +61,16 @@ impl Session {
         Ok(())
     }
 
-    pub async fn get_stream(&self, proto: &str, addr: &str) -> Result<MyStream> {
+    pub async fn get_stream(&self, proto: &str, addr: &str) -> Result<DuplexStream> {
         let conn_id = self.next_conn_id.fetch_add(1, Ordering::SeqCst);
-        let stream = MyStream::new(conn_id, proto, addr);
+
+        let (buf_client, buf_server) = tokio::io::duplex(64);
+        let stream = MyStream::new(conn_id, proto, addr, buf_server);
+
+        // todo
+
+        // let conns = self.conns.lock().await;
+        // conns.insert(conn_id, stream);
 
         let msg = Message::Connect(Connect {
             id: 0,
@@ -74,10 +81,10 @@ impl Session {
 
         self.msg_tx.send(msg).await?;
 
-        Ok(stream)
+        Ok(buf_client)
     }
 
-    async fn process_read<R: AsyncReadExt + Unpin>(&self, read: &mut R) -> Result<()> {
+    async fn process_read<R: AsyncRead + Unpin>(&self, read: &mut R) -> Result<()> {
         loop {
             let msg = Message::read(read).await?;
 
@@ -87,12 +94,20 @@ impl Session {
                     // info!("create connect!! -> {:?}", connect);
                     // tokio::io::copy_bidirectional(a, b)
                 }
+                Message::Data(data) => {
+                    let conn_id = data.conn_id;
+                    // let conn = self.conns.get(&data.conn_id).unwrap();
+                    // conn.write_all(&data.data)?;
+
+                    return Ok(());
+                }
+
                 _ => return Ok(()),
             }
         }
     }
 
-    async fn process_write<R: AsyncWriteExt + Unpin>(&self, write: &mut R) -> Result<()> {
+    async fn process_write<R: AsyncWrite + Unpin>(&self, write: &mut R) -> Result<()> {
         let mut rx = self.msg_rx.lock().await;
         while let Some(msg) = rx.recv().await {
             // todo break loop
@@ -109,12 +124,15 @@ impl Session {
     }
 
     async fn client_connect(&self, connect: Connect) -> Result<()> {
-        let mut mystream = MyStream::new(connect.conn_id, &connect.proto, &connect.addr);
+        let (mut buf_client, buf_server) = tokio::io::duplex(64);
+        let mut mystream =
+            MyStream::new(connect.conn_id, &connect.proto, &connect.addr, buf_server);
         if connect.proto == "tcp" {
             let mut stream = TcpStream::connect(connect.addr).await?;
 
-            tokio::io::copy_bidirectional(&mut mystream, &mut stream).await?;
+            tokio::io::copy_bidirectional(&mut buf_client, &mut stream).await?;
         }
+
         Ok(())
     }
 }

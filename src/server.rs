@@ -4,6 +4,7 @@ use anyhow::{anyhow, Ok, Result};
 use std::collections::HashMap;
 use std::net::SocketAddr;
 use std::sync::Arc;
+use tokio::io::DuplexStream;
 use tokio::task;
 
 use tokio::net::{TcpListener, TcpStream};
@@ -17,7 +18,7 @@ pub trait Authorizer {
 pub struct Server<A: Authorizer> {
     ath: Arc<A>,
     addr: SocketAddr,
-    sess: Arc<Mutex<HashMap<String, Arc<Session>>>>,
+    sess: Arc<Mutex<HashMap<String, Arc<Session<DuplexStream>>>>>,
 }
 
 impl<A> Server<A>
@@ -72,7 +73,7 @@ where
         token: &str,
         proto: &str,
         addr: &str,
-    ) -> Result<Option<MyStream>> {
+    ) -> Result<Option<DuplexStream>> {
         let lock = self.sess.lock().await;
         match lock.get(token) {
             Some(session) => {
