@@ -1,6 +1,6 @@
-use crate::{Connect, Data, Message, MyStream};
+use crate::{Connect, Data, Message};
 use anyhow::{Ok, Result};
-use tokio::{spawn, task};
+use tokio::{task};
 
 use std::collections::HashMap;
 use std::sync::atomic::{AtomicI64, Ordering};
@@ -62,7 +62,7 @@ impl Session {
         Ok(())
     }
 
-    pub async fn get_stream(&self, proto: &str, addr: &str) -> Result<DuplexStream> {
+    pub async fn get_stream(&self, proto: &str, _addr: &str) -> Result<DuplexStream> {
         let conn_id = self.next_conn_id.fetch_add(1, Ordering::SeqCst);
 
         let (buf_client, buf_server) = tokio::io::duplex(64);
@@ -137,7 +137,7 @@ impl Session {
 
     async fn client_connect(&self, connect: Connect) -> Result<()> {
         if connect.proto == "tcp" {
-            let mut stream = TcpStream::connect(&connect.addr).await?;
+            let stream = TcpStream::connect(&connect.addr).await?;
 
             let msg_bus = self.msg_tx.clone();
 
@@ -160,10 +160,10 @@ impl Session {
 }
 
 async fn process_stream<T: AsyncRead + AsyncWrite>(
-    conn_id: i64,
-    stream: T,
-    rx: Receiver<Data>,
-    msg_bus: Sender<Message>,
+    _conn_id: i64,
+    _stream: T,
+    _rx: Receiver<Data>,
+    _msg_bus: Sender<Message>,
 ) -> Result<()> {
     Ok(())
 }

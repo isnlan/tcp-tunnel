@@ -1,7 +1,7 @@
-use crate::{Data, Message};
-use anyhow::Result;
-use tokio::io::{AsyncRead, AsyncReadExt, AsyncWrite, AsyncWriteExt};
-use tokio::sync::mpsc::{self, Receiver, Sender};
+use crate::{Data};
+
+use tokio::io::{AsyncRead, AsyncWrite, AsyncWriteExt};
+use tokio::sync::mpsc::{Receiver};
 
 #[derive(Debug)]
 pub struct MyStream<T: AsyncRead + AsyncWrite> {
@@ -25,7 +25,7 @@ impl<T: AsyncRead + AsyncWrite + Unpin> MyStream<T> {
 
     pub async fn serve(&mut self) {
         while let Some(data) = self.rx.recv().await {
-            let ret = self.stream.write_all(&data.data).await.unwrap();
+            let _ret = self.stream.write_all(&data.data).await.unwrap();
         }
     }
 }
