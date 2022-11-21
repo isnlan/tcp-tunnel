@@ -1,7 +1,7 @@
-use crate::{Data};
+use crate::Data;
 
 use tokio::io::{AsyncRead, AsyncWrite, AsyncWriteExt};
-use tokio::sync::mpsc::{Receiver};
+use tokio::sync::mpsc::Receiver;
 
 #[derive(Debug)]
 pub struct MyStream<T: AsyncRead + AsyncWrite> {
