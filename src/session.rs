@@ -4,11 +4,11 @@ use tokio::task;
 
 use std::collections::HashMap;
 use std::sync::atomic::{AtomicI64, Ordering};
-use tokio::io::{AsyncRead, AsyncWrite, DuplexStream};
+use tokio::io::{AsyncRead, AsyncReadExt, AsyncWrite, AsyncWriteExt, DuplexStream};
 use tokio::net::TcpStream;
 use tokio::sync::mpsc::{self, Receiver, Sender};
 use tokio::sync::Mutex;
-use tracing::{debug, error, warn};
+use tracing::{debug, error, info, warn};
 
 pub struct Session {
     next_conn_id: AtomicI64,
@@ -55,7 +55,7 @@ impl Session {
             }
         };
 
-        tokio::join!(r, w);
+        let _ = tokio::join!(r, w);
 
         warn!("session server closed!");
 
@@ -66,10 +66,9 @@ impl Session {
         let conn_id = self.next_conn_id.fetch_add(1, Ordering::SeqCst);
 
         let (buf_client, buf_server) = tokio::io::duplex(64);
-        let (tx, rx) = mpsc::channel(64);
-        // let stream = MyStream::new(conn_id, proto, addr, buf_server, rx);
 
-        // todo
+        let (tx, rx) = mpsc::channel(64);
+
         let msg_bus = self.msg_tx.clone();
         task::spawn(async move {
             process_stream(conn_id, buf_server, rx, msg_bus)
@@ -151,19 +150,46 @@ impl Session {
             let mut conns = self.conns.lock().await;
             conns.insert(connect.conn_id, tx);
 
-            // let mystream =
-            // MyStream::new(connect.conn_id, &connect.proto, &connect.addr, stream, rx);
+            // tokio::io::copy_bidirectional(a, b)
         }
 
         Ok(())
     }
 }
 
-async fn process_stream<T: AsyncRead + AsyncWrite>(
-    _conn_id: i64,
-    _stream: T,
-    _rx: Receiver<Data>,
-    _msg_bus: Sender<Message>,
+async fn process_stream<T: AsyncReadExt + AsyncWrite + Unpin>(
+    conn_id: i64,
+    mut stream: T,
+    mut rx: Receiver<Data>,
+    msg_bus: Sender<Message>,
 ) -> Result<()> {
+    let r = async {
+        loop {
+            let mut buf = vec![];
+            stream.read_to_end(&mut buf).await.unwrap();
+
+            let data = Data {
+                id: 1,
+                conn_id: conn_id,
+                data: buf,
+            };
+
+            if let Err(err) = msg_bus.send(Message::Data(data)).await {
+                error!("send message error: {}", err);
+
+                break;
+            }
+        }
+    };
+
+    let w = async {
+        while let Some(data) = rx.recv().await {
+            info!("resciver data: {}", data.id);
+            // stream.write_all(&data.data).await;
+        }
+    };
+
+    let _ = tokio::join!(r, w);
+
     Ok(())
 }
