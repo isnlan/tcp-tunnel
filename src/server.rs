@@ -18,7 +18,7 @@ pub trait Authorizer {
 pub struct Server<A: Authorizer> {
     ath: Arc<A>,
     addr: SocketAddr,
-    sess: Arc<Mutex<HashMap<String, Arc<Session<DuplexStream>>>>>,
+    sess: Arc<Mutex<HashMap<String, Arc<Session>>>>,
 }
 
 impl<A> Server<A>

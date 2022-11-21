@@ -1,5 +1,6 @@
-use crate::{Connect, Message, MyStream};
+use crate::{Connect, Data, Message, MyStream};
 use anyhow::{Ok, Result};
+use tokio::{spawn, task};
 
 use std::collections::HashMap;
 use std::sync::atomic::{AtomicI64, Ordering};
@@ -9,18 +10,18 @@ use tokio::sync::mpsc::{self, Receiver, Sender};
 use tokio::sync::Mutex;
 use tracing::{debug, error, warn};
 
-pub struct Session<T: AsyncRead + AsyncWrite> {
+pub struct Session {
     next_conn_id: AtomicI64,
     token: String,
     session_key: i64,
     stream: Mutex<TcpStream>,
-    conns: Mutex<HashMap<i64, MyStream<T>>>,
+    conns: Mutex<HashMap<i64, Sender<Data>>>,
     client: bool,
     msg_tx: Sender<Message>,
     msg_rx: Mutex<Receiver<Message>>,
 }
 
-impl<T: AsyncRead + AsyncWrite> Session<T> {
+impl Session {
     pub fn new(token: String, session_key: i64, steam: TcpStream, client: bool) -> Self {
         let (tx, rx) = mpsc::channel(100);
 
@@ -65,12 +66,19 @@ impl<T: AsyncRead + AsyncWrite> Session<T> {
         let conn_id = self.next_conn_id.fetch_add(1, Ordering::SeqCst);
 
         let (buf_client, buf_server) = tokio::io::duplex(64);
-        let _stream = MyStream::new(conn_id, proto, addr, buf_server);
+        let (tx, rx) = mpsc::channel(64);
+        // let stream = MyStream::new(conn_id, proto, addr, buf_server, rx);
 
         // todo
+        let msg_bus = self.msg_tx.clone();
+        task::spawn(async move {
+            process_stream(conn_id, buf_server, rx, msg_bus)
+                .await
+                .unwrap();
+        });
 
-        // let conns = self.conns.lock().await;
-        // conns.insert(conn_id, stream);
+        let mut conns = self.conns.lock().await;
+        conns.insert(conn_id, tx);
 
         let msg = Message::Connect(Connect {
             id: 0,
@@ -91,13 +99,17 @@ impl<T: AsyncRead + AsyncWrite> Session<T> {
             match msg {
                 Message::Connect(connect) => {
                     self.client_connect(connect).await?;
-                    // info!("create connect!! -> {:?}", connect);
-                    // tokio::io::copy_bidirectional(a, b)
                 }
                 Message::Data(data) => {
-                    let _conn_id = data.conn_id;
-                    // let conn = self.conns.get(&data.conn_id).unwrap();
-                    // conn.write_all(&data.data)?;
+                    let conns = self.conns.lock().await;
+
+                    match conns.get(&data.conn_id) {
+                        Some(tx) => tx.send(data).await.unwrap(),
+
+                        None => {
+                            continue;
+                        }
+                    }
 
                     return Ok(());
                 }
@@ -124,14 +136,34 @@ impl<T: AsyncRead + AsyncWrite> Session<T> {
     }
 
     async fn client_connect(&self, connect: Connect) -> Result<()> {
-        let (mut buf_client, buf_server) = tokio::io::duplex(64);
-        let _mystream = MyStream::new(connect.conn_id, &connect.proto, &connect.addr, buf_server);
         if connect.proto == "tcp" {
-            let mut stream = TcpStream::connect(connect.addr).await?;
+            let mut stream = TcpStream::connect(&connect.addr).await?;
 
-            tokio::io::copy_bidirectional(&mut buf_client, &mut stream).await?;
+            let msg_bus = self.msg_tx.clone();
+
+            let (tx, rx) = mpsc::channel(64);
+            task::spawn(async move {
+                process_stream(connect.conn_id, stream, rx, msg_bus)
+                    .await
+                    .unwrap();
+            });
+
+            let mut conns = self.conns.lock().await;
+            conns.insert(connect.conn_id, tx);
+
+            // let mystream =
+            // MyStream::new(connect.conn_id, &connect.proto, &connect.addr, stream, rx);
         }
 
         Ok(())
     }
+}
+
+async fn process_stream<T: AsyncRead + AsyncWrite>(
+    conn_id: i64,
+    stream: T,
+    rx: Receiver<Data>,
+    msg_bus: Sender<Message>,
+) -> Result<()> {
+    Ok(())
 }

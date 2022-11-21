@@ -1,29 +1,32 @@
-use crate::Data;
+use crate::{Data, Message};
 use anyhow::Result;
-use tokio::io::{AsyncRead, AsyncWrite};
+use tokio::io::{AsyncRead, AsyncReadExt, AsyncWrite, AsyncWriteExt};
+use tokio::sync::mpsc::{self, Receiver, Sender};
 
 #[derive(Debug)]
 pub struct MyStream<T: AsyncRead + AsyncWrite> {
     conn_id: i64,
     proto: String,
     addr: String,
-    // buf_client: tokio::io::DuplexStream,
-    buf_server: T,
+    stream: T,
+    rx: Receiver<Data>,
 }
 
-impl<T: AsyncRead + AsyncWrite> MyStream<T> {
-    pub fn new(conn_id: i64, proto: &str, addr: &str, buf_server: T) -> Self {
-        // let (buf_client, mut buf_server) = tokio::io::duplex(64);
+impl<T: AsyncRead + AsyncWrite + Unpin> MyStream<T> {
+    pub fn new(conn_id: i64, proto: &str, addr: &str, stream: T, rx: Receiver<Data>) -> Self {
         MyStream {
             conn_id,
             proto: proto.to_string(),
             addr: addr.to_string(),
-            buf_server,
+            stream,
+            rx,
         }
     }
 
-    pub fn on_data(_data: Data) -> Result<()> {
-        Ok(())
+    pub async fn serve(&mut self) {
+        while let Some(data) = self.rx.recv().await {
+            let ret = self.stream.write_all(&data.data).await.unwrap();
+        }
     }
 }
 
