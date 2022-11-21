@@ -1,4 +1,4 @@
-use crate::{message::Message, session::Session, MyStream};
+use crate::{message::Message, session::Session};
 
 use anyhow::{anyhow, Ok, Result};
 use std::collections::HashMap;

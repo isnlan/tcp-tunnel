@@ -7,7 +7,7 @@ use tokio::io::{AsyncRead, AsyncWrite, DuplexStream};
 use tokio::net::TcpStream;
 use tokio::sync::mpsc::{self, Receiver, Sender};
 use tokio::sync::Mutex;
-use tracing::{debug, error, info, warn};
+use tracing::{debug, error, warn};
 
 pub struct Session<T: AsyncRead + AsyncWrite> {
     next_conn_id: AtomicI64,
@@ -65,7 +65,7 @@ impl<T: AsyncRead + AsyncWrite> Session<T> {
         let conn_id = self.next_conn_id.fetch_add(1, Ordering::SeqCst);
 
         let (buf_client, buf_server) = tokio::io::duplex(64);
-        let stream = MyStream::new(conn_id, proto, addr, buf_server);
+        let _stream = MyStream::new(conn_id, proto, addr, buf_server);
 
         // todo
 
@@ -95,7 +95,7 @@ impl<T: AsyncRead + AsyncWrite> Session<T> {
                     // tokio::io::copy_bidirectional(a, b)
                 }
                 Message::Data(data) => {
-                    let conn_id = data.conn_id;
+                    let _conn_id = data.conn_id;
                     // let conn = self.conns.get(&data.conn_id).unwrap();
                     // conn.write_all(&data.data)?;
 
@@ -125,8 +125,7 @@ impl<T: AsyncRead + AsyncWrite> Session<T> {
 
     async fn client_connect(&self, connect: Connect) -> Result<()> {
         let (mut buf_client, buf_server) = tokio::io::duplex(64);
-        let mut mystream =
-            MyStream::new(connect.conn_id, &connect.proto, &connect.addr, buf_server);
+        let _mystream = MyStream::new(connect.conn_id, &connect.proto, &connect.addr, buf_server);
         if connect.proto == "tcp" {
             let mut stream = TcpStream::connect(connect.addr).await?;
 

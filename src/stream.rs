@@ -22,7 +22,7 @@ impl<T: AsyncRead + AsyncWrite> MyStream<T> {
         }
     }
 
-    pub fn on_data(data: Data) -> Result<()> {
+    pub fn on_data(_data: Data) -> Result<()> {
         Ok(())
     }
 }
