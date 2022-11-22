@@ -22,6 +22,8 @@ use tracing_subscriber::FmtSubscriber;
 async fn main() -> Result<()> {
     let subscriber = FmtSubscriber::builder()
         .with_max_level(Level::DEBUG)
+        .with_file(true)
+        .with_line_number(true)
         // completes the builder.
         .finish();
 

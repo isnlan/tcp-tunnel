@@ -129,7 +129,7 @@ impl Session {
                 _ => {
                     debug!("send -> {:?}", msg);
 
-                    msg.write(write).await?;
+                    msg.write(write).await;
                 }
             }
         }
@@ -192,18 +192,6 @@ async fn process_stream<T: AsyncRead + AsyncWrite + Unpin>(
                     return;
                 }
             }
-
-            // let data = Data {
-            //     id: 1,
-            //     conn_id: conn_id,
-            //     data: buf,
-            // };
-
-            // if let Err(err) = msg_bus.send(Message::Data(data)).await {
-            //     error!("send message error: {}", err);
-
-            //     break;
-            // }
         }
     };
 
