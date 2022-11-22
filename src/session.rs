@@ -95,6 +95,8 @@ impl Session {
         loop {
             let msg = Message::read(read).await?;
 
+            debug!("msg: {:?}", msg);
+
             match msg {
                 Message::Connect(connect) => {
                     self.client_connect(connect).await?;
@@ -110,7 +112,7 @@ impl Session {
                         }
                     }
 
-                    return Ok(());
+                    // return Ok(());
                 }
 
                 _ => return Ok(()),
