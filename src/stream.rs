@@ -40,20 +40,20 @@ pub fn new(
     msg_bus: Sender<Message>,
 ) -> (Stream, StreamStub) {
     let buffer = Arc::new(Mutex::new(BytesMut::new()));
-    let stream = Stream {
-        conn_id,
-        msg_bus,
-        buffer: buffer.clone(),
-    };
 
-    let stub = StreamStub {
-        conn_id,
-        proto: proto.to_string(),
-        addr: addr.to_string(),
-        buffer,
-    };
-
-    (stream, stub)
+    (
+        Stream {
+            conn_id,
+            msg_bus,
+            buffer: buffer.clone(),
+        },
+        StreamStub {
+            conn_id,
+            proto: proto.to_string(),
+            addr: addr.to_string(),
+            buffer,
+        },
+    )
 }
 
 impl AsyncRead for Stream {
