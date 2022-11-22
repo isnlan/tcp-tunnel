@@ -1,65 +1,91 @@
-use crate::Data;
+use std::sync::Arc;
 
+use crate::{Data, Message};
+
+use anyhow::Result;
+use bytes::BytesMut;
 use tokio::io::{AsyncRead, AsyncWrite, AsyncWriteExt};
-use tokio::sync::mpsc::Receiver;
+use tokio::net::TcpStream;
+use tokio::sync::mpsc::{self, Receiver, Sender};
+use tokio::sync::Mutex;
 
 #[derive(Debug)]
-pub struct MyStream<T: AsyncRead + AsyncWrite> {
+pub struct Stream {
+    conn_id: i64,
+    buffer: Arc<Mutex<BytesMut>>,
+    msg_bus: Sender<Message>,
+}
+
+pub struct StreamStub {
     conn_id: i64,
     proto: String,
     addr: String,
-    stream: T,
-    rx: Receiver<Data>,
+    buffer: Arc<Mutex<BytesMut>>,
 }
 
-impl<T: AsyncRead + AsyncWrite + Unpin> MyStream<T> {
-    pub fn new(conn_id: i64, proto: &str, addr: &str, stream: T, rx: Receiver<Data>) -> Self {
-        MyStream {
-            conn_id,
-            proto: proto.to_string(),
-            addr: addr.to_string(),
-            stream,
-            rx,
-        }
-    }
+impl StreamStub {
+    pub async fn on_message(&self, data: Data) -> Result<()> {
+        // self.tx.send(msg).await?;
+        let mut lock = self.buffer.lock().await;
+        lock.extend_from_slice(&data.data);
 
-    pub async fn serve(&mut self) {
-        while let Some(data) = self.rx.recv().await {
-            let _ret = self.stream.write_all(&data.data).await.unwrap();
-        }
+        Ok(())
     }
 }
 
-// impl AsyncRead for MyStream {
-//     fn poll_read(
-//         self: std::pin::Pin<&mut Self>,
-//         cx: &mut std::task::Context<'_>,
-//         buf: &mut tokio::io::ReadBuf<'_>,
-//     ) -> std::task::Poll<std::io::Result<()>> {
-//         todo!()
-//     }
-// }
+pub fn new(
+    conn_id: i64,
+    proto: &str,
+    addr: &str,
+    msg_bus: Sender<Message>,
+) -> (Stream, StreamStub) {
+    let buffer = Arc::new(Mutex::new(BytesMut::new()));
+    let stream = Stream {
+        conn_id,
+        msg_bus,
+        buffer: buffer.clone(),
+    };
 
-// impl AsyncWrite for MyStream {
-//     fn poll_write(
-//         self: std::pin::Pin<&mut Self>,
-//         cx: &mut std::task::Context<'_>,
-//         buf: &[u8],
-//     ) -> std::task::Poll<Result<usize, std::io::Error>> {
-//         todo!()
-//     }
+    let stub = StreamStub {
+        conn_id,
+        proto: proto.to_string(),
+        addr: addr.to_string(),
+        buffer,
+    };
 
-//     fn poll_flush(
-//         self: std::pin::Pin<&mut Self>,
-//         cx: &mut std::task::Context<'_>,
-//     ) -> std::task::Poll<Result<(), std::io::Error>> {
-//         todo!()
-//     }
+    (stream, stub)
+}
 
-//     fn poll_shutdown(
-//         self: std::pin::Pin<&mut Self>,
-//         cx: &mut std::task::Context<'_>,
-//     ) -> std::task::Poll<Result<(), std::io::Error>> {
-//         todo!()
-//     }
-// }
+impl AsyncRead for Stream {
+    fn poll_read(
+        self: std::pin::Pin<&mut Self>,
+        cx: &mut std::task::Context<'_>,
+        buf: &mut tokio::io::ReadBuf<'_>,
+    ) -> std::task::Poll<std::io::Result<()>> {
+        todo!()
+    }
+}
+
+impl AsyncWrite for Stream {
+    fn poll_write(
+        self: std::pin::Pin<&mut Self>,
+        cx: &mut std::task::Context<'_>,
+        buf: &[u8],
+    ) -> std::task::Poll<Result<usize, std::io::Error>> {
+        todo!()
+    }
+
+    fn poll_flush(
+        self: std::pin::Pin<&mut Self>,
+        cx: &mut std::task::Context<'_>,
+    ) -> std::task::Poll<Result<(), std::io::Error>> {
+        todo!()
+    }
+
+    fn poll_shutdown(
+        self: std::pin::Pin<&mut Self>,
+        cx: &mut std::task::Context<'_>,
+    ) -> std::task::Poll<Result<(), std::io::Error>> {
+        todo!()
+    }
+}
