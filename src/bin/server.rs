@@ -1,7 +1,7 @@
 use anyhow::Result;
 
 use tcp_tunnel::Server;
-use tokio::task;
+use tokio::{io::AsyncWriteExt, task};
 
 use axum::{
     error_handling::HandleErrorLayer,
@@ -68,9 +68,13 @@ async fn root(
 ) -> std::result::Result<String, StatusCode> {
     match server.get_stream(&token, &proto, &addr).await {
         Ok(stream) => match stream {
-            Some(_steam) => Ok("ok".to_string()),
+            Some(mut steam) => {
+                steam.write_all("hello".as_bytes()).await;
+                Ok("ok".to_string())
+            }
             None => Err(StatusCode::NOT_FOUND),
         },
+
         Err(_err) => Err(StatusCode::INTERNAL_SERVER_ERROR),
     }
 }
