@@ -1,5 +1,5 @@
 use crate::{Connect, Data, Message};
-use anyhow::{Ok, Result};
+use anyhow::Result;
 use tokio::task;
 
 use std::collections::HashMap;
@@ -62,7 +62,7 @@ impl Session {
         Ok(())
     }
 
-    pub async fn get_stream(&self, proto: &str, _addr: &str) -> Result<DuplexStream> {
+    pub async fn get_stream(&self, proto: &str, addr: &str) -> Result<DuplexStream> {
         let conn_id = self.next_conn_id.fetch_add(1, Ordering::SeqCst);
 
         let (buf_client, buf_server) = tokio::io::duplex(64);
@@ -83,7 +83,7 @@ impl Session {
             id: 0,
             conn_id,
             proto: proto.to_string(),
-            addr: proto.to_string(),
+            addr: addr.to_string(),
         });
 
         self.msg_tx.send(msg).await?;
@@ -159,7 +159,7 @@ impl Session {
     }
 }
 
-async fn process_stream<T: AsyncReadExt + AsyncWrite + Unpin>(
+async fn process_stream<T: AsyncRead + AsyncWrite + Unpin>(
     conn_id: i64,
     mut stream: T,
     mut rx: Receiver<Data>,
@@ -167,20 +167,43 @@ async fn process_stream<T: AsyncReadExt + AsyncWrite + Unpin>(
 ) -> Result<()> {
     let r = async {
         loop {
-            let mut buf = vec![];
-            stream.read_to_end(&mut buf).await.unwrap();
+            let mut buf = vec![0; 1024];
+            match stream.read(&mut buf).await {
+                Ok(0) => {
+                    debug!("read buffer len = 0");
+                    break;
+                }
+                Ok(n) => {
+                    buf.truncate(n);
+                    let data = Data {
+                        id: 1,
+                        conn_id,
+                        data: buf,
+                    };
 
-            let data = Data {
-                id: 1,
-                conn_id: conn_id,
-                data: buf,
-            };
+                    if let Err(err) = msg_bus.send(Message::Data(data)).await {
+                        error!("send message error: {}", err);
 
-            if let Err(err) = msg_bus.send(Message::Data(data)).await {
-                error!("send message error: {}", err);
-
-                break;
+                        break;
+                    }
+                }
+                Err(err) => {
+                    error!("read error: {}", err);
+                    return;
+                }
             }
+
+            // let data = Data {
+            //     id: 1,
+            //     conn_id: conn_id,
+            //     data: buf,
+            // };
+
+            // if let Err(err) = msg_bus.send(Message::Data(data)).await {
+            //     error!("send message error: {}", err);
+
+            //     break;
+            // }
         }
     };
 
