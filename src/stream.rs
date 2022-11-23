@@ -1,6 +1,6 @@
 use futures_util::pin_mut;
 
-use tokio::io::{AsyncRead, AsyncWrite, AsyncWriteExt, ReadBuf};
+use tokio::io::{AsyncRead, AsyncWrite, ReadBuf};
 
 use bytes::{Buf, BytesMut};
 use std::io::ErrorKind;

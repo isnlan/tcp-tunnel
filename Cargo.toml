@@ -17,7 +17,6 @@ tracing-subscriber = "0.3.15"
 rand = "0.8.4"
 parking_lot = "0.12.1"
 crossbeam-channel = "0.5.1"
-pin-project = "1.0.8"
 futures-util = "0.3.18"
 
 axum = "0.5.17"
