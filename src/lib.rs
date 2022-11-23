@@ -5,6 +5,7 @@ mod session;
 mod stream;
 pub mod utils;
 
+mod mutex;
 pub use client::connect;
 pub use message::*;
 pub use server::*;
