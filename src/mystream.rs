@@ -1,8 +1,8 @@
-use std::{future::Future, io::ErrorKind, pin::Pin, sync::Mutex, task::Poll};
+use std::{future::Future, io::ErrorKind, sync::Mutex, task::Poll};
 
 // use futures_util::pin_mut;
 use tokio::{
-    io::{AsyncRead, AsyncReadExt, AsyncWrite, AsyncWriteExt, DuplexStream, ReadBuf},
+    io::{AsyncRead, AsyncReadExt, AsyncWrite, AsyncWriteExt, DuplexStream},
     sync::mpsc::Sender,
 };
 use tracing::error;
@@ -96,22 +96,22 @@ impl AsyncRead for Stream {
 impl AsyncWrite for Stream {
     fn poll_write(
         self: std::pin::Pin<&mut Self>,
-        cx: &mut std::task::Context<'_>,
-        buf: &[u8],
+        _cx: &mut std::task::Context<'_>,
+        _buf: &[u8],
     ) -> std::task::Poll<Result<usize, std::io::Error>> {
         todo!()
     }
 
     fn poll_flush(
         self: std::pin::Pin<&mut Self>,
-        cx: &mut std::task::Context<'_>,
+        _cx: &mut std::task::Context<'_>,
     ) -> std::task::Poll<Result<(), std::io::Error>> {
         todo!()
     }
 
     fn poll_shutdown(
         self: std::pin::Pin<&mut Self>,
-        cx: &mut std::task::Context<'_>,
+        _cx: &mut std::task::Context<'_>,
     ) -> std::task::Poll<Result<(), std::io::Error>> {
         todo!()
     }
