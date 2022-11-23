@@ -1,3 +1,5 @@
+use futures_util::{pin_mut, FutureExt};
+use pin_project::pin_project;
 use tokio::io::{AsyncRead, AsyncWrite, AsyncWriteExt, ReadBuf};
 
 use bytes::{Buf, BytesMut};
@@ -149,9 +151,11 @@ impl AsyncWrite for Pipe {
 }
 
 #[derive(Debug)]
+// #[pin_project]
 pub struct Stream {
     conn_id: i64,
     pipe: Arc<Mutex<Pipe>>,
+    // #[pin]
     msg_bus: Sender<Message>,
 }
 
@@ -227,11 +231,28 @@ impl AsyncWrite for Stream {
     #[allow(unused_mut)]
     fn poll_write(
         mut self: Pin<&mut Self>,
-        _cx: &mut task::Context<'_>,
-        _buf: &[u8],
+        cx: &mut task::Context<'_>,
+        buf: &[u8],
     ) -> Poll<std::io::Result<usize>> {
-        // Pin::new(&mut self.write_internal(buf)).poll(cx)
-        todo!()
+        // let this = self.project();
+        // this.write_internal(buf).poll(cx)
+
+        let data = Data {
+            id: 12,
+            conn_id: self.conn_id,
+            data: buf.to_vec(),
+        };
+
+        let f1 = futures_util::future::maybe_done(self.write_internal(buf));
+        pin_mut!(f1);
+        match f1.as_mut().take_output() {
+            Some(ret) => match ret {
+                Ok(n) => Poll::Ready(Ok(n)),
+                Err(_) => todo!(),
+            },
+            None => Poll::Pending,
+        }
+        // todo!()
     }
 
     #[allow(unused_mut)]
