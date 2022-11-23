@@ -1,5 +1,5 @@
-use futures_util::{pin_mut, FutureExt};
-use pin_project::pin_project;
+use futures_util::pin_mut;
+
 use tokio::io::{AsyncRead, AsyncWrite, AsyncWriteExt, ReadBuf};
 
 use bytes::{Buf, BytesMut};
@@ -231,13 +231,13 @@ impl AsyncWrite for Stream {
     #[allow(unused_mut)]
     fn poll_write(
         mut self: Pin<&mut Self>,
-        cx: &mut task::Context<'_>,
+        _cx: &mut task::Context<'_>,
         buf: &[u8],
     ) -> Poll<std::io::Result<usize>> {
         // let this = self.project();
         // this.write_internal(buf).poll(cx)
 
-        let data = Data {
+        let _data = Data {
             id: 12,
             conn_id: self.conn_id,
             data: buf.to_vec(),
