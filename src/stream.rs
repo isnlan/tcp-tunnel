@@ -244,7 +244,7 @@ impl AsyncWrite for Stream {
         match f1.as_mut().take_output() {
             Some(ret) => match ret {
                 Ok(n) => Poll::Ready(Ok(n)),
-                Err(_) => todo!(),
+                Err(err) => Poll::Ready(Err(err)),
             },
             None => Poll::Pending,
         }
