@@ -1,8 +1,7 @@
-use futures_util::pin_mut;
-
 use bytes::{Buf, BytesMut};
 use std::io::ErrorKind;
 use std::{
+    future::Future,
     pin::Pin,
     sync::Arc,
     task::{self, Poll, Waker},
@@ -227,7 +226,7 @@ impl AsyncWrite for Stream {
     #[allow(unused_mut)]
     fn poll_write(
         mut self: Pin<&mut Self>,
-        _cx: &mut task::Context<'_>,
+        cx: &mut task::Context<'_>,
         buf: &[u8],
     ) -> Poll<std::io::Result<usize>> {
         // let this = self.project();
@@ -239,15 +238,10 @@ impl AsyncWrite for Stream {
             data: buf.to_vec(),
         };
 
-        let f1 = futures_util::future::maybe_done(self.write_internal(buf));
-        pin_mut!(f1);
-        match f1.as_mut().take_output() {
-            Some(ret) => match ret {
-                Ok(n) => Poll::Ready(Ok(n)),
-                Err(err) => Poll::Ready(Err(err)),
-            },
-            None => Poll::Pending,
-        }
+        // let f1 = self.write_internal(buf);
+        // pin_mut!(f1);
+        // f1.as_mut().poll(cx)
+        Box::pin(self.write_internal(buf)).as_mut().poll(cx)
     }
 
     #[allow(unused_mut)]

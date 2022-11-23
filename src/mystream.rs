@@ -1,6 +1,6 @@
-use std::{io::ErrorKind, pin::Pin, sync::Mutex, task::Poll};
+use std::{future::Future, io::ErrorKind, pin::Pin, sync::Mutex, task::Poll};
 
-use futures_util::pin_mut;
+// use futures_util::pin_mut;
 use tokio::{
     io::{AsyncRead, AsyncReadExt, AsyncWrite, AsyncWriteExt, DuplexStream, ReadBuf},
     sync::mpsc::Sender,
@@ -76,23 +76,19 @@ impl AsyncRead for Stream {
         cx: &mut std::task::Context<'_>,
         buf: &mut tokio::io::ReadBuf<'_>,
     ) -> std::task::Poll<std::io::Result<()>> {
-        // Pin::new(self.reader).poll().read(cx, buf)
         let mut v = vec![];
         let mut reader = self.reader.lock().unwrap();
-        // let f0 = reader.read(&mut v);
-        let f1 = futures_util::future::maybe_done(reader.read(&mut v));
-        pin_mut!(f1);
-        match f1.as_mut().take_output() {
-            Some(ret) => match ret {
+
+        match Box::pin(reader.read(&mut v)).as_mut().poll(cx) {
+            Poll::Ready(ret) => match ret {
                 Ok(n) => {
                     v.truncate(n);
                     buf.put_slice(&v);
-
                     Poll::Ready(Ok(()))
                 }
                 Err(err) => Poll::Ready(Err(err)),
             },
-            None => Poll::Pending,
+            Poll::Pending => Poll::Pending,
         }
     }
 }
