@@ -1,7 +1,5 @@
 use futures_util::pin_mut;
 
-use tokio::io::{AsyncRead, AsyncWrite, ReadBuf};
-
 use bytes::{Buf, BytesMut};
 use std::io::ErrorKind;
 use std::{
@@ -10,12 +8,10 @@ use std::{
     task::{self, Poll, Waker},
 };
 
+use tokio::io::{AsyncRead, AsyncWrite, AsyncWriteExt, ReadBuf};
 use tokio::sync::mpsc::Sender;
 use tracing::error;
 
-// use crossbeam_channel::Sender;
-
-// use tokio::sync::Mutex;
 use crate::mutex::Mutex;
 use crate::{Data, Message};
 
