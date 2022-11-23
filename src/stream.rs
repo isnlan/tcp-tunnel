@@ -252,7 +252,6 @@ impl AsyncWrite for Stream {
             },
             None => Poll::Pending,
         }
-        // todo!()
     }
 
     #[allow(unused_mut)]
