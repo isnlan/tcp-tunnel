@@ -4,9 +4,9 @@ use crate::{Data, Message};
 
 use anyhow::Result;
 use bytes::BytesMut;
-use tokio::io::{AsyncRead, AsyncWrite, AsyncWriteExt};
-use tokio::net::TcpStream;
-use tokio::sync::mpsc::{self, Receiver, Sender};
+use tokio::io::{AsyncRead, AsyncWrite};
+
+use tokio::sync::mpsc::Sender;
 use tokio::sync::Mutex;
 
 #[derive(Debug)]
@@ -59,8 +59,8 @@ pub fn new(
 impl AsyncRead for Stream {
     fn poll_read(
         self: std::pin::Pin<&mut Self>,
-        cx: &mut std::task::Context<'_>,
-        buf: &mut tokio::io::ReadBuf<'_>,
+        _cx: &mut std::task::Context<'_>,
+        _buf: &mut tokio::io::ReadBuf<'_>,
     ) -> std::task::Poll<std::io::Result<()>> {
         todo!()
     }
@@ -69,22 +69,22 @@ impl AsyncRead for Stream {
 impl AsyncWrite for Stream {
     fn poll_write(
         self: std::pin::Pin<&mut Self>,
-        cx: &mut std::task::Context<'_>,
-        buf: &[u8],
+        _cx: &mut std::task::Context<'_>,
+        _buf: &[u8],
     ) -> std::task::Poll<Result<usize, std::io::Error>> {
         todo!()
     }
 
     fn poll_flush(
         self: std::pin::Pin<&mut Self>,
-        cx: &mut std::task::Context<'_>,
+        _cx: &mut std::task::Context<'_>,
     ) -> std::task::Poll<Result<(), std::io::Error>> {
         todo!()
     }
 
     fn poll_shutdown(
         self: std::pin::Pin<&mut Self>,
-        cx: &mut std::task::Context<'_>,
+        _cx: &mut std::task::Context<'_>,
     ) -> std::task::Poll<Result<(), std::io::Error>> {
         todo!()
     }

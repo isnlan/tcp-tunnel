@@ -1,5 +1,5 @@
 use crate::session::Session;
-use crate::{Connect, Message};
+use crate::Message;
 use anyhow::{Context, Result};
 use backoff::future::retry_notify;
 use backoff::ExponentialBackoff;
