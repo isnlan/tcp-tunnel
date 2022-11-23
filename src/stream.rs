@@ -6,8 +6,10 @@ use std::{
     sync::Arc,
     task::{self, Poll, Waker},
 };
+use std::io::ErrorKind;
 
 use tokio::sync::mpsc::Sender;
+use tracing::error;
 
 // use crossbeam_channel::Sender;
 
@@ -153,6 +155,26 @@ pub struct Stream {
     msg_bus: Sender<Message>,
 }
 
+impl Stream {
+    async fn write_internal(&self, buf: &[u8]) -> std::io::Result<usize> {
+        let data = Data {
+            id: 12,
+            conn_id: self.conn_id,
+            data: buf.to_vec(),
+        };
+
+        match self.msg_bus.send(Message::Data(data)).await {
+            Ok(_) => {
+                Ok(buf.len())
+            }
+            Err(err) => {
+                error!("send error: {}", err);
+                Err(std::io::Error::new(ErrorKind::BrokenPipe, "send error"))
+            }
+        }
+    }
+}
+
 pub struct StreamStub {
     conn_id: i64,
     proto: String,
@@ -210,23 +232,7 @@ impl AsyncWrite for Stream {
         _cx: &mut task::Context<'_>,
         buf: &[u8],
     ) -> Poll<std::io::Result<usize>> {
-        let _data = Data {
-            id: 12,
-            conn_id: self.conn_id,
-            data: buf.to_vec(),
-        };
-
-        // match  Pin::new(&mut self.msg_bus.send(Message::Data(data))).poll(cx) {
-        //     Poll::Ready(ret) => {
-        //         match ret {
-        //             Ok(_) => Poll::Ready(Ok(buf.len())),
-        //             Err(err) => Poll::Pending,
-        //         }
-        //     },
-        //     Poll::Pending => {
-        //         Poll::Pending
-        //     },
-        // }
+       // Pin::new(&mut self.write_internal(buf)).poll(cx)
         todo!()
     }
 
