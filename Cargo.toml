@@ -16,6 +16,7 @@ tracing = "0.1.36"
 tracing-subscriber = "0.3.15"
 rand = "0.8.4"
 parking_lot = "0.12.1"
+crossbeam-channel = "0.5.6"
 
 axum = "0.5.17"
 tower = { version = "0.4", features = ["util", "timeout", "load-shed", "limit"] }

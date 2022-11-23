@@ -1,22 +1,6 @@
-//! A minimal adaption of the `parking_lot` synchronization primitives to the
-//! equivalent `std::sync` types.
-//!
-//! This can be extended to additional types/methods as required.
-
 use std::fmt;
 use std::marker::PhantomData;
 use std::ops::{Deref, DerefMut};
-use std::sync::LockResult;
-use std::time::Duration;
-
-// All types in this file are marked with PhantomData to ensure that
-// parking_lot's send_guard feature does not leak through and affect when Tokio
-// types are Send.
-//
-// See <https://github.com/tokio-rs/tokio/pull/4359> for more info.
-
-// Types that do not need wrapping
-pub(crate) use parking_lot::WaitTimeoutResult;
 
 #[derive(Debug)]
 pub(crate) struct Mutex<T: ?Sized>(PhantomData<std::sync::Mutex<T>>, parking_lot::Mutex<T>);
@@ -54,9 +38,6 @@ impl<T> Mutex<T> {
     pub(crate) fn get_mut(&mut self) -> &mut T {
         self.1.get_mut()
     }
-
-    // Note: Additional methods `is_poisoned` and `into_inner`, can be
-    // provided here as needed.
 }
 
 impl<'a, T: ?Sized> Deref for MutexGuard<'a, T> {

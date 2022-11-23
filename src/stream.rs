@@ -6,7 +6,13 @@ use std::{
     sync::Arc,
     task::{self, Poll, Waker},
 };
+use std::future::Future;
+use std::task::ready;
+use anyhow::anyhow;
 use tokio::sync::mpsc::Sender;
+use tower::Service;
+// use crossbeam_channel::Sender;
+use tracing::error;
 // use tokio::sync::Mutex;
 use crate::mutex::Mutex;
 use crate::{Data, Message};
@@ -177,8 +183,8 @@ pub fn new(
     (
         Stream {
             conn_id,
-            msg_bus,
             pipe: buffer.clone(),
+            msg_bus,
         },
         StreamStub {
             conn_id,
@@ -190,7 +196,6 @@ pub fn new(
 }
 
 impl AsyncRead for Stream {
-    #[allow(unused_mut)]
     fn poll_read(
         mut self: Pin<&mut Self>,
         cx: &mut task::Context<'_>,
@@ -201,25 +206,46 @@ impl AsyncRead for Stream {
 }
 
 impl AsyncWrite for Stream {
+    #[allow(unused_mut)]
     fn poll_write(
-        self: std::pin::Pin<&mut Self>,
-        _cx: &mut std::task::Context<'_>,
-        _buf: &[u8],
-    ) -> std::task::Poll<Result<usize, std::io::Error>> {
+        mut self: Pin<&mut Self>,
+        cx: &mut task::Context<'_>,
+        buf: &[u8],
+    ) -> Poll<std::io::Result<usize>> {
+        let data = Data{
+            id: 12,
+            conn_id: self.conn_id,
+            data: buf.to_vec(),
+        };
+
+        // match  Pin::new(&mut self.msg_bus.send(Message::Data(data))).poll(cx) {
+        //     Poll::Ready(ret) => {
+        //         match ret {
+        //             Ok(_) => Poll::Ready(Ok(buf.len())),
+        //             Err(err) => Poll::Pending,
+        //         }
+        //     },
+        //     Poll::Pending => {
+        //         Poll::Pending
+        //     },
+        // }
         todo!()
+
     }
 
+    #[allow(unused_mut)]
     fn poll_flush(
-        self: std::pin::Pin<&mut Self>,
-        _cx: &mut std::task::Context<'_>,
-    ) -> std::task::Poll<Result<(), std::io::Error>> {
-        todo!()
+        mut self: Pin<&mut Self>,
+        cx: &mut task::Context<'_>,
+    ) -> Poll<std::io::Result<()>> {
+        Poll::Ready(Ok(()))
     }
 
+    #[allow(unused_mut)]
     fn poll_shutdown(
-        self: std::pin::Pin<&mut Self>,
-        _cx: &mut std::task::Context<'_>,
-    ) -> std::task::Poll<Result<(), std::io::Error>> {
-        todo!()
+        mut self: Pin<&mut Self>,
+        cx: &mut task::Context<'_>,
+    ) -> Poll<std::io::Result<()>> {
+        Pin::new(&mut *self.pipe.lock()).poll_shutdown(cx)
     }
 }
