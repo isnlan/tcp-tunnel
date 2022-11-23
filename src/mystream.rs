@@ -85,7 +85,9 @@ impl AsyncRead for Stream {
         match f1.as_mut().take_output() {
             Some(ret) => match ret {
                 Ok(n) => {
+                    v.truncate(n);
                     buf.put_slice(&v);
+
                     Poll::Ready(Ok(()))
                 }
                 Err(err) => Poll::Ready(Err(err)),
