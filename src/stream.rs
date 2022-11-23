@@ -6,13 +6,11 @@ use std::{
     sync::Arc,
     task::{self, Poll, Waker},
 };
-use std::future::Future;
-use std::task::ready;
-use anyhow::anyhow;
+
 use tokio::sync::mpsc::Sender;
-use tower::Service;
+
 // use crossbeam_channel::Sender;
-use tracing::error;
+
 // use tokio::sync::Mutex;
 use crate::mutex::Mutex;
 use crate::{Data, Message};
@@ -197,7 +195,7 @@ pub fn new(
 
 impl AsyncRead for Stream {
     fn poll_read(
-        mut self: Pin<&mut Self>,
+        self: Pin<&mut Self>,
         cx: &mut task::Context<'_>,
         buf: &mut ReadBuf<'_>,
     ) -> Poll<std::io::Result<()>> {
@@ -209,10 +207,10 @@ impl AsyncWrite for Stream {
     #[allow(unused_mut)]
     fn poll_write(
         mut self: Pin<&mut Self>,
-        cx: &mut task::Context<'_>,
+        _cx: &mut task::Context<'_>,
         buf: &[u8],
     ) -> Poll<std::io::Result<usize>> {
-        let data = Data{
+        let _data = Data {
             id: 12,
             conn_id: self.conn_id,
             data: buf.to_vec(),
@@ -230,13 +228,12 @@ impl AsyncWrite for Stream {
         //     },
         // }
         todo!()
-
     }
 
     #[allow(unused_mut)]
     fn poll_flush(
         mut self: Pin<&mut Self>,
-        cx: &mut task::Context<'_>,
+        _cx: &mut task::Context<'_>,
     ) -> Poll<std::io::Result<()>> {
         Poll::Ready(Ok(()))
     }
