@@ -1,4 +1,4 @@
-use std::{future::Future, io::ErrorKind, task::Poll};
+use std::{future::Future, io::ErrorKind};
 
 // use futures_util::pin_mut;
 use tokio::{
@@ -104,7 +104,7 @@ impl AsyncWrite for Stream {
 
     fn poll_shutdown(
         self: std::pin::Pin<&mut Self>,
-        cx: &mut std::task::Context<'_>,
+        _cx: &mut std::task::Context<'_>,
     ) -> std::task::Poll<Result<(), std::io::Error>> {
         todo!()
     }
@@ -112,7 +112,7 @@ impl AsyncWrite for Stream {
 
 #[cfg(test)]
 mod tests {
-    use std::{io::Cursor, time::Duration};
+    use std::time::Duration;
 
     use tokio::{sync, task};
 
@@ -120,7 +120,7 @@ mod tests {
 
     #[tokio::test]
     async fn it_works() -> anyhow::Result<()> {
-        let (bus_tx, bus_rx) = sync::mpsc::channel(10);
+        let (bus_tx, _bus_rx) = sync::mpsc::channel(10);
 
         let (mut a, b) = new(1, "tcp", "127.0.0.1:8888", bus_tx);
 
@@ -143,7 +143,7 @@ mod tests {
         // let mut rbf = ReadBuf::new(&mut buf);
         // let v1 = a.read_internel(&mut rbf).await?;
 
-        let len = a
+        let _len = a
             .read_exact(&mut buf)
             .await
             .map_err(|e| {
