@@ -260,3 +260,31 @@ impl AsyncWrite for Stream {
         Pin::new(&mut *self.pipe.lock()).poll_shutdown(cx)
     }
 }
+
+// #[cfg(test)]
+// mod tests {
+//     use std::io::Cursor;
+
+//     use tokio::{sync, task};
+
+//     use super::*;
+
+//     #[tokio::test]
+//     async fn it_works() -> anyhow::Result<()> {
+//         let (bus_tx, bus_rx) = sync::mpsc::channel(10);
+
+//         let (a, b) = new(1, "tcp", "127.0.0.1:8888", bus_tx);
+
+//         task::spawn(async move {
+//             b.on_message(Data {
+//                 id: 1,
+//                 conn_id: 1,
+//                 data: "hello".as_bytes().to_vec(),
+//             })
+//             .await
+//             .unwrap();
+//         })
+//         .await;
+//         Ok(())
+//     }
+// }
