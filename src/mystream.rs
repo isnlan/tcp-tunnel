@@ -114,6 +114,8 @@ impl AsyncWrite for Stream {
 mod tests {
     use std::time::Duration;
 
+    use anyhow::Ok;
+    use bytes::BufMut;
     use tokio::{sync, task};
 
     use super::*;
@@ -153,6 +155,39 @@ mod tests {
             .unwrap();
         println!("-- {:?}", buf);
         // assert_eq!(&buf, b"ping");
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_reader() {
+        let mut v = [0u8; 10];
+        let mut buf = tokio::io::ReadBuf::new(&mut v);
+        println!("remaing {}", buf.remaining());
+        buf.put_slice("ping".as_bytes());
+
+        println!("remaing {}", buf.remaining());
+        // println!(" --- >{:?}", v);
+        let mut b1 = buf.filled();
+        // b1.(&b"fsf"[..]);
+        println!("0 --- >{:?}", b1);
+
+        println!("1 --- >{:?}", v);
+        // println!("1 --- >{:?}", b1);
+    }
+
+    #[tokio::test]
+    async fn test_readr_trait() -> anyhow::Result<()> {
+        let (mut a, mut b) = tokio::io::duplex(8);
+        a.write_all(b"ping").await?;
+
+        let mut v = [0u8; 10];
+        let mut buf = tokio::io::ReadBuf::new(&mut v);
+        buf.put_slice("hello".as_bytes());
+
+        b.read_exact(&mut v).await?;
+
+        println!("========== {:?}", v);
 
         Ok(())
     }
