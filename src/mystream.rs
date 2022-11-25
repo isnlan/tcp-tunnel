@@ -185,7 +185,12 @@ mod tests {
         let mut buf = tokio::io::ReadBuf::new(&mut v);
         buf.put_slice("hello".as_bytes());
 
-        b.read_exact(&mut v).await?;
+        let b1 =
+            unsafe { &mut *(buf.unfilled_mut() as *mut [std::mem::MaybeUninit<u8>] as *mut [u8]) };
+
+        let ret = b.read(b1).await?;
+        unsafe { buf.assume_init(ret) };
+        buf.advance(ret);
 
         println!("========== {:?}", v);
 
