@@ -32,9 +32,16 @@ impl Stream {
         }
     }
 
-    async fn read_internel(&self, buf: &mut ReadBuf<'_>) -> std::io::Result<()> {
+    async fn read_internal(&self, buf: &mut ReadBuf<'_>) -> std::io::Result<()> {
+        let b =
+            unsafe { &mut *(buf.unfilled_mut() as *mut [std::mem::MaybeUninit<u8>] as *mut [u8]) };
+
         let mut reader = self.reader.lock().await;
-        let _ = reader.read_exact(buf.initialized_mut()).await?;
+
+        let ret = reader.read(b).await?;
+        unsafe { buf.assume_init(ret) };
+        buf.advance(ret);
+
         Ok(())
     }
 }
@@ -82,7 +89,7 @@ impl AsyncRead for Stream {
         cx: &mut std::task::Context<'_>,
         buf: &mut tokio::io::ReadBuf<'_>,
     ) -> std::task::Poll<std::io::Result<()>> {
-        Box::pin(self.read_internel(buf)).as_mut().poll(cx)
+        Box::pin(self.read_internal(buf)).as_mut().poll(cx)
     }
 }
 
@@ -140,13 +147,13 @@ mod tests {
 
         tokio::time::sleep(Duration::from_secs(1)).await;
 
-        let mut buf = [0u8; 4];
+        let mut buf = [0u8; 40];
 
         // let mut rbf = ReadBuf::new(&mut buf);
         // let v1 = a.read_internel(&mut rbf).await?;
 
         let _len = a
-            .read_exact(&mut buf)
+            .read(&mut buf)
             .await
             .map_err(|e| {
                 println! {"err {:?}", e};
@@ -179,11 +186,11 @@ mod tests {
     #[tokio::test]
     async fn test_readr_trait() -> anyhow::Result<()> {
         let (mut a, mut b) = tokio::io::duplex(8);
-        a.write_all(b"ping").await?;
+        let l1 = a.write(b"pingpingping").await?;
 
-        let mut v = [0u8; 10];
+        let mut v = [0u8; 12];
         let mut buf = tokio::io::ReadBuf::new(&mut v);
-        buf.put_slice("hello".as_bytes());
+        // buf.put_slice("hello".as_bytes());
 
         let b1 =
             unsafe { &mut *(buf.unfilled_mut() as *mut [std::mem::MaybeUninit<u8>] as *mut [u8]) };
@@ -193,6 +200,35 @@ mod tests {
         buf.advance(ret);
 
         println!("========== {:?}", v);
+
+        Ok(())
+    }
+
+    #[tokio::test]
+    async fn test_readr_trait1() -> anyhow::Result<()> {
+        let (mut a, mut b) = tokio::io::duplex(8);
+
+        task::spawn(async move {
+            let l1 = a.write_all(b"pingpingping").await.unwrap();
+        });
+
+        println!("-----");
+        for i in 0..3 {
+            let mut v = [0u8; 10];
+            let mut buf = tokio::io::ReadBuf::new(&mut v);
+            // buf.put_slice("hello".as_bytes());
+
+            let b1 = unsafe {
+                &mut *(buf.unfilled_mut() as *mut [std::mem::MaybeUninit<u8>] as *mut [u8])
+            };
+
+            let ret = b.read_exact(b1).await?;
+            unsafe { buf.assume_init(ret) };
+            buf.advance(ret);
+
+            tokio::time::sleep(Duration::from_secs(1)).await;
+            println!("========== {:?}", v);
+        }
 
         Ok(())
     }
