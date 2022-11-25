@@ -115,7 +115,7 @@ impl AsyncWrite for Stream {
     #[allow(unused_mut)]
     fn poll_shutdown(
         mut self: std::pin::Pin<&mut Self>,
-        cx: &mut std::task::Context<'_>,
+        _cx: &mut std::task::Context<'_>,
     ) -> Poll<std::io::Result<()>> {
         Poll::Ready(Ok(()))
     }
@@ -126,7 +126,7 @@ mod tests {
     use std::time::Duration;
 
     use anyhow::Ok;
-    use bytes::BufMut;
+
     use tokio::{sync, task};
 
     use super::*;
@@ -174,7 +174,7 @@ mod tests {
     async fn test_writer() -> anyhow::Result<()> {
         let (bus_tx, mut bus_rx) = sync::mpsc::channel(10);
 
-        let (mut a, b) = new(1, "tcp", "127.0.0.1:8888", bus_tx);
+        let (mut a, _b) = new(1, "tcp", "127.0.0.1:8888", bus_tx);
 
         task::spawn(async move {
             while let Some(msg) = bus_rx.recv().await {

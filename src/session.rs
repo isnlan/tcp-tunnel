@@ -1,16 +1,16 @@
 use anyhow::Result;
 use tokio::task;
 
+use crate::message::{Connect, Message};
+use crate::stream::{Stream, StreamStub};
+use crate::{message, stream};
 use std::collections::HashMap;
 use std::sync::atomic::{AtomicI64, Ordering};
 use tokio::io::{AsyncRead, AsyncWrite};
 use tokio::net::TcpStream;
 use tokio::sync::mpsc::{self, Receiver, Sender};
 use tokio::sync::Mutex;
-use tracing::{debug, error, info, warn};
-use crate::{message, stream};
-use crate::message::{Connect, Message};
-use crate::stream::{Stream, StreamStub};
+use tracing::{debug, error, warn};
 
 pub struct Session {
     next_conn_id: AtomicI64,
@@ -141,7 +141,9 @@ impl Session {
             );
 
             task::spawn(async move {
-                tokio::io::copy_bidirectional(&mut stream, &mut s).await.unwrap();
+                tokio::io::copy_bidirectional(&mut stream, &mut s)
+                    .await
+                    .unwrap();
             });
 
             let mut conns = self.conns.lock().await;
