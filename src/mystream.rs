@@ -1,3 +1,4 @@
+use std::task::Poll;
 use std::{future::Future, io::ErrorKind};
 
 // use futures_util::pin_mut;
@@ -88,32 +89,35 @@ impl AsyncRead for Stream {
         self: std::pin::Pin<&mut Self>,
         cx: &mut std::task::Context<'_>,
         buf: &mut tokio::io::ReadBuf<'_>,
-    ) -> std::task::Poll<std::io::Result<()>> {
+    ) -> Poll<std::io::Result<()>> {
         Box::pin(self.read_internal(buf)).as_mut().poll(cx)
     }
 }
 
 impl AsyncWrite for Stream {
+    #[allow(unused_mut)]
     fn poll_write(
-        self: std::pin::Pin<&mut Self>,
-        _cx: &mut std::task::Context<'_>,
-        _buf: &[u8],
-    ) -> std::task::Poll<Result<usize, std::io::Error>> {
-        todo!()
+        mut self: std::pin::Pin<&mut Self>,
+        cx: &mut std::task::Context<'_>,
+        buf: &[u8],
+    ) -> Poll<std::io::Result<usize>> {
+        Box::pin(self.write_internal(buf)).as_mut().poll(cx)
     }
 
+    #[allow(unused_mut)]
     fn poll_flush(
-        self: std::pin::Pin<&mut Self>,
+        mut self: std::pin::Pin<&mut Self>,
         _cx: &mut std::task::Context<'_>,
-    ) -> std::task::Poll<Result<(), std::io::Error>> {
-        todo!()
+    ) -> Poll<std::io::Result<()>> {
+        Poll::Ready(Ok(()))
     }
 
+    #[allow(unused_mut)]
     fn poll_shutdown(
-        self: std::pin::Pin<&mut Self>,
-        _cx: &mut std::task::Context<'_>,
-    ) -> std::task::Poll<Result<(), std::io::Error>> {
-        todo!()
+        mut self: std::pin::Pin<&mut Self>,
+        cx: &mut std::task::Context<'_>,
+    ) -> Poll<std::io::Result<()>> {
+        Poll::Ready(Ok(()))
     }
 }
 
@@ -207,6 +211,7 @@ mod tests {
     #[tokio::test]
     async fn test_readr_trait1() -> anyhow::Result<()> {
         let (mut a, mut b) = tokio::io::duplex(8);
+
 
         task::spawn(async move {
             let l1 = a.write_all(b"pingpingping").await.unwrap();
