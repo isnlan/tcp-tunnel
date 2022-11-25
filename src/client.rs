@@ -1,5 +1,4 @@
 use crate::session::Session;
-use crate::Message;
 use anyhow::{Context, Result};
 use backoff::future::retry_notify;
 use backoff::ExponentialBackoff;
@@ -8,6 +7,7 @@ use tokio::net::TcpStream;
 
 use tokio::time::Duration;
 use tracing::warn;
+use crate::message::Message;
 
 pub async fn connect(addr: &str, token: &str) -> Result<()> {
     let backoff = ExponentialBackoff {

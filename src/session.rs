@@ -1,14 +1,16 @@
-use crate::{stream, Connect, Data, Message, Stream, StreamStub};
 use anyhow::Result;
 use tokio::task;
 
 use std::collections::HashMap;
 use std::sync::atomic::{AtomicI64, Ordering};
-use tokio::io::{AsyncRead, AsyncReadExt, AsyncWrite, AsyncWriteExt, DuplexStream};
+use tokio::io::{AsyncRead, AsyncWrite};
 use tokio::net::TcpStream;
 use tokio::sync::mpsc::{self, Receiver, Sender};
 use tokio::sync::Mutex;
 use tracing::{debug, error, info, warn};
+use crate::{message, stream};
+use crate::message::{Connect, Message};
+use crate::stream::{Stream, StreamStub};
 
 pub struct Session {
     next_conn_id: AtomicI64,
@@ -46,7 +48,7 @@ impl Session {
                 error!("session process read error: {:?}", err);
             }
 
-            self.msg_tx.send(Message::Close).await
+            self.msg_tx.send(message::Message::Close).await
         };
 
         let w = async {
@@ -148,52 +150,4 @@ impl Session {
 
         Ok(())
     }
-}
-
-async fn process_stream<T: AsyncRead + AsyncWrite + Unpin>(
-    conn_id: i64,
-    mut stream: T,
-    mut rx: Receiver<Data>,
-    msg_bus: Sender<Message>,
-) -> Result<()> {
-    let r = async {
-        loop {
-            let mut buf = vec![0; 1024];
-            match stream.read(&mut buf).await {
-                Ok(0) => {
-                    debug!("read buffer len = 0");
-                    break;
-                }
-                Ok(n) => {
-                    buf.truncate(n);
-                    let data = Data {
-                        id: 1,
-                        conn_id,
-                        data: buf,
-                    };
-
-                    if let Err(err) = msg_bus.send(Message::Data(data)).await {
-                        error!("send message error: {}", err);
-
-                        break;
-                    }
-                }
-                Err(err) => {
-                    error!("read error: {}", err);
-                    return;
-                }
-            }
-        }
-    };
-
-    let w = async {
-        while let Some(data) = rx.recv().await {
-            info!("resciver data: {}", data.id);
-            // stream.write_all(&data.data).await;
-        }
-    };
-
-    let _ = tokio::join!(r, w);
-
-    Ok(())
 }

@@ -8,7 +8,7 @@ use tokio::{
 };
 use tracing::error;
 
-use crate::{Data, Message};
+use crate::message::{Data, Message};
 
 pub struct Stream {
     conn_id: i64,
@@ -88,7 +88,7 @@ impl AsyncRead for Stream {
     fn poll_read(
         self: std::pin::Pin<&mut Self>,
         cx: &mut std::task::Context<'_>,
-        buf: &mut tokio::io::ReadBuf<'_>,
+        buf: &mut ReadBuf<'_>,
     ) -> Poll<std::io::Result<()>> {
         Box::pin(self.read_internal(buf)).as_mut().poll(cx)
     }

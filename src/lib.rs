@@ -3,14 +3,10 @@ mod message;
 mod server;
 mod session;
 mod stream;
-pub mod utils;
+mod utils;
 
-mod mutex;
 pub use client::connect;
-pub use message::*;
-pub use server::*;
-pub use stream::*;
-pub use utils::*;
+pub use server::{Authorizer, Server};
 
 #[cfg(test)]
 mod tests {
