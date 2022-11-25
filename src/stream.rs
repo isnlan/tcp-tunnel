@@ -1,156 +1,18 @@
-use bytes::{Buf, BytesMut};
-use std::io::ErrorKind;
-use std::{
-    future::Future,
-    pin::Pin,
-    sync::Arc,
-    task::{self, Poll, Waker},
-};
+use std::task::Poll;
+use std::{future::Future, io::ErrorKind};
 
-use tokio::io::{AsyncRead, AsyncWrite, AsyncWriteExt, ReadBuf};
-use tokio::sync::mpsc::Sender;
+// use futures_util::pin_mut;
+use tokio::{
+    io::{AsyncRead, AsyncReadExt, AsyncWrite, AsyncWriteExt, DuplexStream, ReadBuf},
+    sync::{mpsc::Sender, Mutex},
+};
 use tracing::error;
 
-use crate::mutex::Mutex;
 use crate::{Data, Message};
 
-/// A unidirectional IO over a piece of memory.
-///
-/// Data can be written to the pipe, and reading will return that data.
-#[derive(Debug)]
-struct Pipe {
-    /// The buffer storing the bytes written, also read from.
-    ///
-    /// Using a `BytesMut` because it has efficient `Buf` and `BufMut`
-    /// functionality already. Additionally, it can try to copy data in the
-    /// same buffer if there read index has advanced far enough.
-    buffer: BytesMut,
-    /// Determines if the write side has been closed.
-    is_closed: bool,
-    /// The maximum amount of bytes that can be written before returning
-    /// `Poll::Pending`.
-    max_buf_size: usize,
-    /// If the `read` side has been polled and is pending, this is the waker
-    /// for that parked task.
-    read_waker: Option<Waker>,
-    /// If the `write` side has filled the `max_buf_size` and returned
-    /// `Poll::Pending`, this is the waker for that parked task.
-    write_waker: Option<Waker>,
-}
-
-impl Pipe {
-    fn new(max_buf_size: usize) -> Self {
-        Pipe {
-            buffer: BytesMut::new(),
-            is_closed: false,
-            max_buf_size,
-            read_waker: None,
-            write_waker: None,
-        }
-    }
-
-    fn close_write(&mut self) {
-        self.is_closed = true;
-        // needs to notify any readers that no more data will come
-        if let Some(waker) = self.read_waker.take() {
-            waker.wake();
-        }
-    }
-
-    fn close_read(&mut self) {
-        self.is_closed = true;
-        // needs to notify any writers that they have to abort
-        if let Some(waker) = self.write_waker.take() {
-            waker.wake();
-        }
-    }
-
-    fn poll_read_internal(
-        mut self: Pin<&mut Self>,
-        cx: &mut task::Context<'_>,
-        buf: &mut ReadBuf<'_>,
-    ) -> Poll<std::io::Result<()>> {
-        if self.buffer.has_remaining() {
-            let max = self.buffer.remaining().min(buf.remaining());
-            buf.put_slice(&self.buffer[..max]);
-            self.buffer.advance(max);
-            if max > 0 {
-                // The passed `buf` might have been empty, don't wake up if
-                // no bytes have been moved.
-                if let Some(waker) = self.write_waker.take() {
-                    waker.wake();
-                }
-            }
-            Poll::Ready(Ok(()))
-        } else if self.is_closed {
-            Poll::Ready(Ok(()))
-        } else {
-            self.read_waker = Some(cx.waker().clone());
-            Poll::Pending
-        }
-    }
-
-    fn poll_write_internal(
-        mut self: Pin<&mut Self>,
-        cx: &mut task::Context<'_>,
-        buf: &[u8],
-    ) -> Poll<std::io::Result<usize>> {
-        if self.is_closed {
-            return Poll::Ready(Err(std::io::ErrorKind::BrokenPipe.into()));
-        }
-        let avail = self.max_buf_size - self.buffer.len();
-        if avail == 0 {
-            self.write_waker = Some(cx.waker().clone());
-            return Poll::Pending;
-        }
-
-        let len = buf.len().min(avail);
-        self.buffer.extend_from_slice(&buf[..len]);
-        if let Some(waker) = self.read_waker.take() {
-            waker.wake();
-        }
-        Poll::Ready(Ok(len))
-    }
-}
-
-impl AsyncRead for Pipe {
-    fn poll_read(
-        self: Pin<&mut Self>,
-        cx: &mut task::Context<'_>,
-        buf: &mut ReadBuf<'_>,
-    ) -> Poll<std::io::Result<()>> {
-        self.poll_read_internal(cx, buf)
-    }
-}
-
-impl AsyncWrite for Pipe {
-    fn poll_write(
-        self: Pin<&mut Self>,
-        cx: &mut task::Context<'_>,
-        buf: &[u8],
-    ) -> Poll<std::io::Result<usize>> {
-        self.poll_write_internal(cx, buf)
-    }
-
-    fn poll_flush(self: Pin<&mut Self>, _: &mut task::Context<'_>) -> Poll<std::io::Result<()>> {
-        Poll::Ready(Ok(()))
-    }
-
-    fn poll_shutdown(
-        mut self: Pin<&mut Self>,
-        _: &mut task::Context<'_>,
-    ) -> Poll<std::io::Result<()>> {
-        self.close_write();
-        Poll::Ready(Ok(()))
-    }
-}
-
-#[derive(Debug)]
-// #[pin_project]
 pub struct Stream {
     conn_id: i64,
-    pipe: Arc<Mutex<Pipe>>,
-    // #[pin]
+    reader: Mutex<DuplexStream>,
     msg_bus: Sender<Message>,
 }
 
@@ -170,20 +32,31 @@ impl Stream {
             }
         }
     }
+
+    async fn read_internal(&self, buf: &mut ReadBuf<'_>) -> std::io::Result<()> {
+        let b =
+            unsafe { &mut *(buf.unfilled_mut() as *mut [std::mem::MaybeUninit<u8>] as *mut [u8]) };
+
+        let mut reader = self.reader.lock().await;
+
+        let ret = reader.read(b).await?;
+        unsafe { buf.assume_init(ret) };
+        buf.advance(ret);
+
+        Ok(())
+    }
 }
 
 pub struct StreamStub {
     conn_id: i64,
     proto: String,
     addr: String,
-    pipe: Arc<Mutex<Pipe>>,
+    writer: Mutex<DuplexStream>,
 }
 
 impl StreamStub {
     pub async fn on_message(&self, data: Data) -> anyhow::Result<()> {
-        // self.tx.send(msg).await?;
-        let mut pipe = self.pipe.lock();
-        pipe.write(&data.data).await?;
+        self.writer.lock().await.write_all(&data.data).await?;
 
         Ok(())
     }
@@ -195,96 +68,123 @@ pub fn new(
     addr: &str,
     msg_bus: Sender<Message>,
 ) -> (Stream, StreamStub) {
-    let buffer = Arc::new(Mutex::new(Pipe::new(1024)));
-
+    let (reader, writer) = tokio::io::duplex(1024);
     (
         Stream {
             conn_id,
-            pipe: buffer.clone(),
+            reader: Mutex::new(reader),
             msg_bus,
         },
         StreamStub {
             conn_id,
             proto: proto.to_string(),
             addr: addr.to_string(),
-            pipe: buffer,
+            writer: Mutex::new(writer),
         },
     )
 }
 
 impl AsyncRead for Stream {
     fn poll_read(
-        self: Pin<&mut Self>,
-        cx: &mut task::Context<'_>,
-        buf: &mut ReadBuf<'_>,
+        self: std::pin::Pin<&mut Self>,
+        cx: &mut std::task::Context<'_>,
+        buf: &mut tokio::io::ReadBuf<'_>,
     ) -> Poll<std::io::Result<()>> {
-        Pin::new(&mut *self.pipe.lock()).poll_read(cx, buf)
+        Box::pin(self.read_internal(buf)).as_mut().poll(cx)
     }
 }
 
 impl AsyncWrite for Stream {
     #[allow(unused_mut)]
     fn poll_write(
-        mut self: Pin<&mut Self>,
-        cx: &mut task::Context<'_>,
+        mut self: std::pin::Pin<&mut Self>,
+        cx: &mut std::task::Context<'_>,
         buf: &[u8],
     ) -> Poll<std::io::Result<usize>> {
-        // let this = self.project();
-        // this.write_internal(buf).poll(cx)
-
-        let _data = Data {
-            id: 12,
-            conn_id: self.conn_id,
-            data: buf.to_vec(),
-        };
-
-        // let f1 = self.write_internal(buf);
-        // pin_mut!(f1);
-        // f1.as_mut().poll(cx)
         Box::pin(self.write_internal(buf)).as_mut().poll(cx)
     }
 
     #[allow(unused_mut)]
     fn poll_flush(
-        mut self: Pin<&mut Self>,
-        _cx: &mut task::Context<'_>,
+        mut self: std::pin::Pin<&mut Self>,
+        _cx: &mut std::task::Context<'_>,
     ) -> Poll<std::io::Result<()>> {
         Poll::Ready(Ok(()))
     }
 
     #[allow(unused_mut)]
     fn poll_shutdown(
-        mut self: Pin<&mut Self>,
-        cx: &mut task::Context<'_>,
+        mut self: std::pin::Pin<&mut Self>,
+        cx: &mut std::task::Context<'_>,
     ) -> Poll<std::io::Result<()>> {
-        Pin::new(&mut *self.pipe.lock()).poll_shutdown(cx)
+        Poll::Ready(Ok(()))
     }
 }
 
-// #[cfg(test)]
-// mod tests {
-//     use std::io::Cursor;
+#[cfg(test)]
+mod tests {
+    use std::time::Duration;
 
-//     use tokio::{sync, task};
+    use anyhow::Ok;
+    use bytes::BufMut;
+    use tokio::{sync, task};
 
-//     use super::*;
+    use super::*;
 
-//     #[tokio::test]
-//     async fn it_works() -> anyhow::Result<()> {
-//         let (bus_tx, bus_rx) = sync::mpsc::channel(10);
+    #[tokio::test]
+    async fn test_reader() -> anyhow::Result<()> {
+        let (bus_tx, _bus_rx) = sync::mpsc::channel(10);
 
-//         let (a, b) = new(1, "tcp", "127.0.0.1:8888", bus_tx);
+        let (mut a, b) = new(1, "tcp", "127.0.0.1:8888", bus_tx);
 
-//         task::spawn(async move {
-//             b.on_message(Data {
-//                 id: 1,
-//                 conn_id: 1,
-//                 data: "hello".as_bytes().to_vec(),
-//             })
-//             .await
-//             .unwrap();
-//         })
-//         .await;
-//         Ok(())
-//     }
-// }
+        task::spawn(async move {
+            b.on_message(Data {
+                id: 1,
+                conn_id: 1,
+                data: "ping".as_bytes().to_vec(),
+            })
+            .await
+            .unwrap();
+        })
+        .await
+        .unwrap();
+
+        tokio::time::sleep(Duration::from_secs(1)).await;
+
+        let mut buf = [0u8; 40];
+
+        // let mut rbf = ReadBuf::new(&mut buf);
+        // let v1 = a.read_internel(&mut rbf).await?;
+
+        let _len = a
+            .read(&mut buf)
+            .await
+            .map_err(|e| {
+                println! {"err {:?}", e};
+                e
+            })
+            .unwrap();
+        println!("-- {:?}", buf);
+        // assert_eq!(&buf, b"ping");
+
+        Ok(())
+    }
+
+    #[tokio::test]
+    async fn test_writer() -> anyhow::Result<()> {
+        let (bus_tx, mut bus_rx) = sync::mpsc::channel(10);
+
+        let (mut a, b) = new(1, "tcp", "127.0.0.1:8888", bus_tx);
+
+        task::spawn(async move {
+            while let Some(msg) = bus_rx.recv().await {
+                println!("<<-- {:?}", msg);
+            }
+        });
+
+        a.write(b"hello").await?;
+        tokio::time::sleep(Duration::from_secs(1)).await;
+
+        Ok(())
+    }
+}

@@ -11,7 +11,6 @@ pub use message::*;
 pub use server::*;
 pub use stream::*;
 pub use utils::*;
-mod mystream;
 
 #[cfg(test)]
 mod tests {

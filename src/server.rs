@@ -1,3 +1,4 @@
+use crate::stream;
 use crate::{message::Message, session::Session};
 
 use anyhow::{anyhow, Ok, Result};
@@ -73,7 +74,7 @@ where
         token: &str,
         proto: &str,
         addr: &str,
-    ) -> Result<Option<DuplexStream>> {
+    ) -> Result<Option<stream::Stream>> {
         let lock = self.sess.lock().await;
         match lock.get(token) {
             Some(session) => {
