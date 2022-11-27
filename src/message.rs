@@ -24,6 +24,7 @@ pub enum Message {
     Connect(Connect),
     Data(Data),
     Close,
+    CloseConnect(i64),
 }
 
 impl Message {

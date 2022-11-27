@@ -6,7 +6,7 @@ use tokio::{
     io::{AsyncRead, AsyncReadExt, AsyncWrite, AsyncWriteExt, DuplexStream, ReadBuf},
     sync::{mpsc::Sender, Mutex},
 };
-use tracing::error;
+use tracing::{debug, error, info};
 
 use crate::message::{Data, Message};
 
@@ -44,6 +44,19 @@ impl Stream {
         buf.advance(ret);
 
         Ok(())
+    }
+}
+
+impl Drop for Stream {
+    fn drop(&mut self) {
+        // if let Err(err) = self
+        //     .msg_bus
+        //     .blocking_send(Message::CloseConnect(self.conn_id))
+        // {
+        //     error!("connect {} drop, send error: {}", self.conn_id, err);
+        // }
+
+        info!("------------connect {} stream drop", self.conn_id);
     }
 }
 
@@ -115,9 +128,17 @@ impl AsyncWrite for Stream {
     #[allow(unused_mut)]
     fn poll_shutdown(
         mut self: std::pin::Pin<&mut Self>,
-        _cx: &mut std::task::Context<'_>,
+        cx: &mut std::task::Context<'_>,
     ) -> Poll<std::io::Result<()>> {
-        Poll::Ready(Ok(()))
+        info!("---------- taget tcp close");
+        Box::pin(self.msg_bus.send(Message::CloseConnect(self.conn_id)))
+            .as_mut()
+            .poll(cx)
+            .map_err(|err| {
+                error!("send error: {}", err);
+                std::io::Error::new(ErrorKind::BrokenPipe, "send error")
+            })
+        // Poll::Ready(Ok(()))
     }
 }
 

@@ -54,7 +54,7 @@ where
             _ => return Err(anyhow!("invalid client token protocol")),
         };
 
-        info!("new client connect, token: {}", token);
+        info!("new client tcp stream, token: {}", token);
 
         let session = Arc::new(Session::new(token.clone(), rand::random(), stream, false));
 

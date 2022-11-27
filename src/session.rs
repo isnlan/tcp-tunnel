@@ -10,7 +10,7 @@ use tokio::io::{AsyncRead, AsyncWrite};
 use tokio::net::TcpStream;
 use tokio::sync::mpsc::{self, Receiver, Sender};
 use tokio::sync::Mutex;
-use tracing::{debug, error, warn};
+use tracing::{debug, error, info, warn};
 
 pub struct Session {
     next_conn_id: AtomicI64,
@@ -65,6 +65,76 @@ impl Session {
     }
 
     pub async fn get_stream(&self, proto: &str, addr: &str) -> Result<Stream> {
+        self.server_connect(proto, addr).await
+    }
+
+    async fn process_read<R: AsyncRead + Unpin>(&self, read: &mut R) -> Result<()> {
+        loop {
+            let msg = Message::read(read).await?;
+
+            debug!("msg: {:?}", msg);
+
+            match msg {
+                Message::Connect(connect) => {
+                    self.client_connect(connect).await?;
+                }
+                Message::Data(data) => {
+                    let conns = self.conns.lock().await;
+
+                    let conn_id = data.conn_id;
+
+                    if let Some(stub) = conns.get(&conn_id) {
+                        if let Err(err) = stub.on_message(data).await {
+                            error!(
+                                    "connect id: {} send data to target tcp/udp error: {}, will remove stream",
+                                    conn_id, err
+                                );
+
+                            self.msg_tx.send(Message::CloseConnect(conn_id)).await?;
+                        };
+                    }
+                }
+                Message::CloseConnect(conn_id) => {
+                    self.close_connect(conn_id).await;
+                }
+
+                _ => unimplemented!(),
+            }
+        }
+    }
+
+    async fn process_write<R: AsyncWrite + Unpin>(&self, write: &mut R) -> Result<()> {
+        let mut rx = self.msg_rx.lock().await;
+        while let Some(msg) = rx.recv().await {
+            match msg {
+                Message::Close => {
+                    debug!("close process write");
+                    break;
+                }
+
+                Message::CloseConnect(conn_id) => {
+                    self.close_connect(conn_id).await;
+
+                    debug!("send -> {:?}", msg);
+                    msg.write(write).await?;
+                }
+                _ => {
+                    debug!("send -> {:?}", msg);
+
+                    msg.write(write).await?;
+                }
+            }
+        }
+        Ok(())
+    }
+
+    async fn close_connect(&self, conn_id: i64) {
+        let mut conns = self.conns.lock().await;
+        warn!("remove connect id: {}", conn_id);
+        conns.remove(&conn_id);
+    }
+
+    async fn server_connect(&self, proto: &str, addr: &str) -> Result<Stream> {
         let conn_id = self.next_conn_id.fetch_add(1, Ordering::SeqCst);
 
         let (stream, stub) = stream::new(conn_id, proto, addr, self.msg_tx.clone());
@@ -84,51 +154,6 @@ impl Session {
         Ok(stream)
     }
 
-    async fn process_read<R: AsyncRead + Unpin>(&self, read: &mut R) -> Result<()> {
-        loop {
-            let msg = Message::read(read).await?;
-
-            debug!("msg: {:?}", msg);
-
-            match msg {
-                Message::Connect(connect) => {
-                    self.client_connect(connect).await?;
-                }
-                Message::Data(data) => {
-                    let conns = self.conns.lock().await;
-
-                    match conns.get(&data.conn_id) {
-                        Some(stub) => stub.on_message(data).await.unwrap(),
-
-                        None => {
-                            continue;
-                        }
-                    }
-
-                    // return Ok(());
-                }
-
-                _ => return Ok(()),
-            }
-        }
-    }
-
-    async fn process_write<R: AsyncWrite + Unpin>(&self, write: &mut R) -> Result<()> {
-        let mut rx = self.msg_rx.lock().await;
-        while let Some(msg) = rx.recv().await {
-            // todo break loop
-            match msg {
-                Message::Close => break,
-                _ => {
-                    debug!("send -> {:?}", msg);
-
-                    msg.write(write).await;
-                }
-            }
-        }
-        Ok(())
-    }
-
     async fn client_connect(&self, connect: Connect) -> Result<()> {
         if connect.proto == "tcp" {
             let mut stream = TcpStream::connect(&connect.addr).await?;
@@ -141,9 +166,12 @@ impl Session {
             );
 
             task::spawn(async move {
-                tokio::io::copy_bidirectional(&mut stream, &mut s)
-                    .await
-                    .unwrap();
+                info!("=======================");
+                if let Err(err) = tokio::io::copy_bidirectional(&mut stream, &mut s).await {
+                    error!("connect {} stream copy error: {:}", connect.conn_id, err);
+                }
+
+                info!("----------------");
             });
 
             let mut conns = self.conns.lock().await;
